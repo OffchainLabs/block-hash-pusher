@@ -10,9 +10,11 @@ interface IBuffer {
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32);
 }
 
+// deployed with CREATE2 on L1 and all arbitrum chains to the same address
+// this is necessary to transition to a native solution
 contract Buffer is IBuffer {
     // these are intentionally not public
-    uint256 constant bufferSize = 10; // todo: pick a reasonable size
+    uint256 constant bufferSize = 10; // todo: pick a reasonable size. this size will be the same for L2's and L3's
     address immutable aliasedPusher;
 
     // we keep the block numbers in a ring buffer, and store the hashes in a mapping
