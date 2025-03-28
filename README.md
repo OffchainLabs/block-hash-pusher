@@ -6,4 +6,4 @@ There are two contracts: `Pusher` and `ParentBlockHashBuffer`. The `Pusher` take
 
 The buffer contract will have the same address on all chains. This will allow us to eventually perform an ArbOS upgrade to etch some new bytecode there and start pushing hashes in there similar to EIP2935.
 
-Should the buffer also store L1 block hashes? maybe.
+Should the buffer also store L1 block hashes? no, because we want to make nitro v1 easier.
