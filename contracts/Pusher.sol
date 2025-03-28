@@ -26,6 +26,7 @@ contract Buffer is IBuffer {
 
     error NotPusher();
     error UnknownParentBlockHash(uint256 parentBlockNumber);
+    error PushedOutOfOrder(uint256 last, uint256 next);
 
     constructor() {
         aliasedPusher = AddressAliasHelper.applyL1ToL2Alias(address(new Pusher(address(this))));
@@ -41,6 +42,12 @@ contract Buffer is IBuffer {
         // if we are overwriting a block number, delete its hash from the mapping
         if (valueAtPtr != 0) {
             blockHashes[valueAtPtr] = 0;
+
+            // don't allow pushing out of order
+            // QUESTION: early return or revert here?
+            if (valueAtPtr >= blockNumber) {
+                revert PushedOutOfOrder(valueAtPtr, blockNumber);
+            }
         }
 
         // write the new block number into the buffer
@@ -87,7 +94,7 @@ contract Pusher {
     // we'll only push one hash for now, but we can extend later to push batches up to size 256 if we want
     /// @notice Push the hash of the previous block to the buffer on the child chain specified by inbox
     ///         For custom fee chains, the caller must either set gasPriceBid, gasLimit, and submissionCost to 0 and manually redeem on the child,
-    ///         or prefund the chain's inbox with the appropriate amount of fees. 
+    ///         or prefund the chain's inbox with the appropriate amount of fees.
     ///         (this is an [efficiency + implementation simplicity] vs [operator UX] tradeoff)
     /// @param inbox The address of the inbox on the child chain
     /// @param gasPriceBid The gas price bid for the transaction.
