@@ -5,6 +5,7 @@ import {ArbSys} from "@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol";
 import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
 import {IInbox} from "@arbitrum/nitro-contracts/src/bridge/IInbox.sol";
 
+// this interface needs to be implemented by a future native solution
 interface IBuffer {
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32);
 }
@@ -31,20 +32,23 @@ contract Buffer is IBuffer {
     function receiveHash(uint256 blockNumber, bytes32 blockHash) external {
         if (msg.sender != aliasedPusher) revert NotPusher();
 
-        // find the next pointer position and the value at that position in the number buffer
-        uint256 nextBufferPtr = (bufferPtr + 1) % bufferSize;
-        uint256 valueAtNextPtr = blockNumberBuffer[nextBufferPtr];
+        // get the pointer position and the value at that position in the number buffer
+        uint256 _bufferPtr = bufferPtr;
+        uint256 valueAtPtr = blockNumberBuffer[_bufferPtr];
 
         // if we are overwriting a block number, delete its hash from the mapping
-        if (valueAtNextPtr != 0) {
-            blockHashes[valueAtNextPtr] = 0;
+        if (valueAtPtr != 0) {
+            blockHashes[valueAtPtr] = 0;
         }
 
         // write the new block number into the buffer
-        blockNumberBuffer[nextBufferPtr] = blockNumber;
+        blockNumberBuffer[_bufferPtr] = blockNumber;
 
         // write the new hash into the mapping
         blockHashes[blockNumber] = blockHash;
+
+        // increment the pointer
+        bufferPtr = (_bufferPtr + 1) % bufferSize;
 
         // should we emit an event? 2935 does not
     }
