@@ -52,13 +52,13 @@ contract Buffer is IBuffer {
         // increment the pointer
         bufferPtr = (_bufferPtr + 1) % bufferSize;
 
-        // should we emit an event? 2935 does not
+        // QUESTION: should we emit an event? 2935 does not
     }
 
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32) {
         bytes32 _parentBlockHash = blockHashes[parentBlockNumber];
 
-        // should this revert or simply return 0?
+        // QUESTION: should this revert or simply return 0?
         if (_parentBlockHash == 0) {
             revert UnknownParentBlockHash(parentBlockNumber);
         }
@@ -115,6 +115,6 @@ contract Pusher {
             data: abi.encodeCall(Buffer.receiveHash, (blockNumber, blockHash))
         });
 
-        // todo: emit an event?
+        // QUESTION: emit an event?
     }
 }
