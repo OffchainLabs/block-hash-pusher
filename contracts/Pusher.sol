@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {ArbSys} from "@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol";
+import {ArbOwnerPublic} from "@arbitrum/nitro-contracts/src/ownership/ArbOwnerPublic.sol";
 import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
 import {IInbox} from "@arbitrum/nitro-contracts/src/bridge/IInbox.sol";
 
@@ -33,7 +34,7 @@ contract Buffer is IBuffer {
     }
 
     function receiveHash(uint256 blockNumber, bytes32 blockHash) external {
-        if (msg.sender != aliasedPusher) revert NotPusher();
+        if (!isAuthorizedPusher(msg.sender)) revert NotPusher();
 
         // get the pointer position and the value at that position in the number buffer
         uint256 _bufferPtr = bufferPtr;
@@ -71,6 +72,10 @@ contract Buffer is IBuffer {
         }
 
         return _parentBlockHash;
+    }
+
+    function isAuthorizedPusher(address account) public view returns (bool) {
+        return account == aliasedPusher || ArbOwnerPublic(address(107)).isChainOwner(account);
     }
 }
 
