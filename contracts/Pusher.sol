@@ -75,20 +75,21 @@ contract Buffer is IBuffer {
 }
 
 contract Pusher {
-    bool immutable isL1;
+    bool immutable isArbitrum;
     address public immutable bufferAddress;
 
-    error NotL1OrArbitrum();
+    error WrongEthAmount(uint256 received, uint256 expected);
 
     constructor(address _bufferAddress) {
         bufferAddress = _bufferAddress;
-        isL1 = block.chainid == 1;
-        if (block.chainid != 1) {
-            try ArbSys(address(100)).arbOSVersion() {}
-            catch {
-                revert NotL1OrArbitrum();
-            }
+
+        // can't set immutable isArbitrum in the catch statement because compiler won't allow it
+        bool _isArbitrum = false;
+        try ArbSys(address(100)).arbOSVersion() {}
+        catch {
+            _isArbitrum = true;
         }
+        isArbitrum = _isArbitrum;
     }
 
     // we'll only push one hash for now, but we can extend later to push batches up to size 256 if we want
@@ -103,12 +104,16 @@ contract Pusher {
     function pushHash(address inbox, uint256 gasPriceBid, uint256 gasLimit, uint256 submissionCost) external payable {
         uint256 blockNumber;
         bytes32 blockHash;
-        if (isL1) {
-            blockNumber = block.number - 1;
-            blockHash = blockhash(blockNumber);
-        } else {
+        if (isArbitrum) {
             blockNumber = ArbSys(address(100)).arbBlockNumber() - 1;
             blockHash = ArbSys(address(100)).arbBlockHash(blockNumber);
+        } else {
+            blockNumber = block.number - 1;
+            blockHash = blockhash(blockNumber);
+        }
+
+        if (gasPriceBid * gasLimit + submissionCost != msg.value) {
+            revert WrongEthAmount(msg.value, gasPriceBid * gasLimit + submissionCost);
         }
 
         IInbox(inbox).createRetryableTicket{value: msg.value}({
