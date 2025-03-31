@@ -10,12 +10,12 @@ interface IBuffer {
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32);
 }
 
-// deployed with CREATE2 on L1 and all arbitrum chains to the same address
+// deployed with CREATE2 on all chains to the same address
 // this is necessary to transition to a native solution
 contract Buffer is IBuffer {
     // these are intentionally not public
-    uint256 constant bufferSize = 10; // todo: pick a reasonable size. this size will be the same for L2's and L3's
-    address immutable aliasedPusher;
+    uint256 public constant bufferSize = 10; // todo: pick a reasonable size. this could be conditional on isArbitrum
+    address public immutable aliasedPusher;
 
     // we keep the block numbers in a ring buffer, and store the hashes in a mapping
     uint256[] blockNumberBuffer;
@@ -75,21 +75,15 @@ contract Buffer is IBuffer {
 }
 
 contract Pusher {
-    bool immutable isArbitrum;
+    bool public immutable isArbitrum;
     address public immutable bufferAddress;
 
     error WrongEthAmount(uint256 received, uint256 expected);
 
     constructor(address _bufferAddress) {
         bufferAddress = _bufferAddress;
-
-        // can't set immutable isArbitrum in the catch statement because compiler won't allow it
-        bool _isArbitrum = false;
-        try ArbSys(address(100)).arbOSVersion() {}
-        catch {
-            _isArbitrum = true;
-        }
-        isArbitrum = _isArbitrum;
+        (, bytes memory data) = address(100).call(abi.encodeWithSignature("arbOSVersion()"));
+        isArbitrum = data.length != 0;
     }
 
     // we'll only push one hash for now, but we can extend later to push batches up to size 256 if we want
