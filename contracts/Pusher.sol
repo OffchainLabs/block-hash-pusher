@@ -4,23 +4,35 @@ pragma solidity ^0.8.13;
 import {ArbSys} from "@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol";
 import {ArbOwnerPublic} from "@arbitrum/nitro-contracts/src/ownership/ArbOwnerPublic.sol";
 import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
+import {ArbitrumChecker} from "@arbitrum/nitro-contracts/src/libraries/ArbitrumChecker.sol";
 import {IInbox} from "@arbitrum/nitro-contracts/src/bridge/IInbox.sol";
 
-// this interface needs to be implemented by a future native solution
+/// @notice This contract is a ring buffer that stores parent chain block hashes.
+/// @dev    This is the guaranteed, public interface for the buffer contract. Future versions may add more functions.
+///         Other functions of a given implementation not included in this interface are not guaranteed to be stable.
+///         The ring buffer is sparse, meaning the block numbers are not guaranteed to be contiguous.
+///         A future version may or may not change the implementation of the ring buffer to be dense.
+///         The size of the ring buffer may increase or decrease in future versions.
 interface IBuffer {
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32);
 }
 
-// deployed with CREATE2 on all chains to the same address
-// this is necessary to transition to a native solution
+/// @notice An implementation of the IBuffer interface.
+/// @dev    This contract is deployed with CREATE2 on all chains to the same address.
+///         This contract's bytecode may or may not be overwritten in a future ArbOS upgrade.
 contract Buffer is IBuffer {
-    // these are intentionally not public
-    uint256 public constant bufferSize = 10; // todo: pick a reasonable size. this could be conditional on isArbitrum
+    /// @notice The size of the ring buffer. This is the maximum number of block hashes that can be stored.
+    /// @dev    Assuming a parent block time of 250ms and L1 block time of 12s,
+    ///         then the amount of time that the buffer covers is equivalent to EIP-2935's.
+    uint256 public constant bufferSize = 393168;
+
+    /// @notice The aliased address of the pusher contract on the parent chain.
+    ///         This address + chain owners are authorized to push hashes.
     address public immutable aliasedPusher;
 
     // we keep the block numbers in a ring buffer, and store the hashes in a mapping
-    uint256[] blockNumberBuffer;
-    uint256 bufferPtr;
+    uint256[] public blockNumberBuffer;
+    uint256 public bufferPtr;
 
     // maps block number to hash
     mapping(uint256 => bytes32) blockHashes;
@@ -61,6 +73,7 @@ contract Buffer is IBuffer {
         bufferPtr = (_bufferPtr + 1) % bufferSize;
 
         // QUESTION: should we emit an event? 2935 does not
+        // i think not, because it may not make sense to in a native solution
     }
 
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32) {
@@ -87,8 +100,7 @@ contract Pusher {
 
     constructor(address _bufferAddress) {
         bufferAddress = _bufferAddress;
-        (, bytes memory data) = address(100).call(abi.encodeWithSignature("arbOSVersion()"));
-        isArbitrum = data.length != 0;
+        isArbitrum = ArbitrumChecker.isArbitrum();
     }
 
     // we'll only push one hash for now, but we can extend later to push batches up to size 256 if we want
