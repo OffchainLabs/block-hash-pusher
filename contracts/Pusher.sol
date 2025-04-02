@@ -30,23 +30,41 @@ contract Buffer is IBuffer {
     ///      This address + chain owners are authorized to push hashes.
     address immutable aliasedPusher;
 
-    // we keep the block numbers in a ring buffer, and store the hashes in a mapping
+    /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
     uint256[] blockNumberBuffer;
+    /// @dev A pointer into the ring buffer. This is the index of the next block number to be pushed.
     uint256 bufferPtr;
 
-    // maps block number to hash
+    /// @dev Maps block numbers to their hashes. This is a mapping of block number to block hash.
+    ///      Block hashes are deleted from the mapping when they are overwritten in the ring buffer.
     mapping(uint256 => bytes32) blockHashes;
 
-    error NotPusher();
+    /// @notice Thrown by `parentBlockHash` when the block hash for a given block number is not found.
     error UnknownParentBlockHash(uint256 parentBlockNumber);
+    /// @dev Thrown when the caller is not authorized to push hashes.
+    error NotPusher();
+    /// @dev Thrown when a block number is pushed out of order.
     error PushedOutOfOrder(uint256 last, uint256 next);
 
     constructor() {
         aliasedPusher = AddressAliasHelper.applyL1ToL2Alias(address(new Pusher(address(this))));
     }
 
+    /// @inheritdoc IBuffer
+    function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32) {
+        bytes32 _parentBlockHash = blockHashes[parentBlockNumber];
+
+        // QUESTION: should this revert or simply return 0?
+        if (_parentBlockHash == 0) {
+            revert UnknownParentBlockHash(parentBlockNumber);
+        }
+
+        return _parentBlockHash;
+    }
+
+    /// @dev Pushes a block hash to the ring buffer. Can only be called by the aliased pusher contract or chain owners.
     function receiveHash(uint256 blockNumber, bytes32 blockHash) external {
-        if (!_isAuthorizedPusher(msg.sender)) revert NotPusher();
+        if (msg.sender != aliasedPusher && !ArbOwnerPublic(address(107)).isChainOwner(msg.sender)) revert NotPusher();
 
         // get the pointer position and the value at that position in the number buffer
         uint256 _bufferPtr = bufferPtr;
@@ -74,21 +92,6 @@ contract Buffer is IBuffer {
 
         // QUESTION: should we emit an event? 2935 does not
         // i think not, because it may not make sense to in a native solution
-    }
-
-    function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32) {
-        bytes32 _parentBlockHash = blockHashes[parentBlockNumber];
-
-        // QUESTION: should this revert or simply return 0?
-        if (_parentBlockHash == 0) {
-            revert UnknownParentBlockHash(parentBlockNumber);
-        }
-
-        return _parentBlockHash;
-    }
-
-    function _isAuthorizedPusher(address account) internal view returns (bool) {
-        return account == aliasedPusher || ArbOwnerPublic(address(107)).isChainOwner(account);
     }
 }
 
