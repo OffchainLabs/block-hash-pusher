@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {ArbSys} from "@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol";
-import {ArbOwnerPublic} from "@arbitrum/nitro-contracts/src/ownership/ArbOwnerPublic.sol";
+import {ArbOwnerPublic} from "@arbitrum/nitro-contracts/src/precompiles/ArbOwnerPublic.sol";
 import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
 import {ArbitrumChecker} from "@arbitrum/nitro-contracts/src/libraries/ArbitrumChecker.sol";
 import {IInbox} from "@arbitrum/nitro-contracts/src/bridge/IInbox.sol";
@@ -21,18 +21,18 @@ interface IBuffer {
 /// @dev    This contract is deployed with CREATE2 on all chains to the same address.
 ///         This contract's bytecode may or may not be overwritten in a future ArbOS upgrade.
 contract Buffer is IBuffer {
-    /// @notice The size of the ring buffer. This is the maximum number of block hashes that can be stored.
-    /// @dev    Assuming a parent block time of 250ms and L1 block time of 12s,
-    ///         then the amount of time that the buffer covers is equivalent to EIP-2935's.
-    uint256 public constant bufferSize = 393168;
+    /// @dev The size of the ring buffer. This is the maximum number of block hashes that can be stored.
+    ///      Assuming a parent block time of 250ms and L1 block time of 12s,
+    ///      then the amount of time that the buffer covers is equivalent to EIP-2935's.
+    uint256 constant bufferSize = 393168;
 
-    /// @notice The aliased address of the pusher contract on the parent chain.
-    ///         This address + chain owners are authorized to push hashes.
-    address public immutable aliasedPusher;
+    /// @dev The aliased address of the pusher contract on the parent chain.
+    ///      This address + chain owners are authorized to push hashes.
+    address immutable aliasedPusher;
 
     // we keep the block numbers in a ring buffer, and store the hashes in a mapping
-    uint256[] public blockNumberBuffer;
-    uint256 public bufferPtr;
+    uint256[] blockNumberBuffer;
+    uint256 bufferPtr;
 
     // maps block number to hash
     mapping(uint256 => bytes32) blockHashes;
@@ -46,7 +46,7 @@ contract Buffer is IBuffer {
     }
 
     function receiveHash(uint256 blockNumber, bytes32 blockHash) external {
-        if (!isAuthorizedPusher(msg.sender)) revert NotPusher();
+        if (!_isAuthorizedPusher(msg.sender)) revert NotPusher();
 
         // get the pointer position and the value at that position in the number buffer
         uint256 _bufferPtr = bufferPtr;
@@ -87,7 +87,7 @@ contract Buffer is IBuffer {
         return _parentBlockHash;
     }
 
-    function isAuthorizedPusher(address account) public view returns (bool) {
+    function _isAuthorizedPusher(address account) internal view returns (bool) {
         return account == aliasedPusher || ArbOwnerPublic(address(107)).isChainOwner(account);
     }
 }
@@ -100,7 +100,7 @@ contract Pusher {
 
     constructor(address _bufferAddress) {
         bufferAddress = _bufferAddress;
-        isArbitrum = ArbitrumChecker.isArbitrum();
+        isArbitrum = ArbitrumChecker.runningOnArbitrum();
     }
 
     // we'll only push one hash for now, but we can extend later to push batches up to size 256 if we want

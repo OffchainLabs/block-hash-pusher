@@ -3,12 +3,14 @@ pragma solidity ^0.8.13;
 
 import {Test, console} from "forge-std/Test.sol";
 
-import "contracts/Pusher.sol";
+import {Pusher} from "contracts/Pusher.sol";
+import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
+import {BufferPublic} from "test/mocks/BufferPublic.sol";
 import "test/mocks/MockArbSys.sol";
 
 contract PusherTest is Test {
     address deployer = address(0xFFFF);
-    Buffer buffer = Buffer(0xE5176a71F063744C55eC55e6D769e915E34FaD7D);
+    BufferPublic buffer = BufferPublic(0xE5176a71F063744C55eC55e6D769e915E34FaD7D);
     Pusher pusher = Pusher(0x5ba7D5e27DFE1E52ccD096e25858424518cEd051);
 
     function testCorrectlyDeterminesIsArbitrum(bool isArbitrum) public {
@@ -23,12 +25,12 @@ contract PusherTest is Test {
         }
         _deploy();
         assertEq(pusher.bufferAddress(), address(buffer));
-        assertEq(buffer.aliasedPusher(), AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
+        assertEq(buffer._aliasedPusher(), AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
     }
 
     function _deploy() public {
         vm.prank(deployer);
-        new Buffer();
+        new BufferPublic();
     }
 
     function _deployArbSys() public {
