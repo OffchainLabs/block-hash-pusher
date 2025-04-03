@@ -26,7 +26,7 @@ contract Buffer is IBuffer {
     uint256 constant bufferSize = 393168;
 
     /// @dev A system address that is authorized to push hashes to the buffer.
-    address constant systemPusher = address(0xA4B05);
+    address constant systemPusher = address(0xA4B05); // todo: choose a good address for this
 
     /// @dev The aliased address of the pusher contract on the parent chain.
     address immutable aliasedPusher;
@@ -38,7 +38,7 @@ contract Buffer is IBuffer {
 
     /// @dev Maps block numbers to their hashes. This is a mapping of block number to block hash.
     ///      Block hashes are deleted from the mapping when they are overwritten in the ring buffer.
-    mapping(uint256 => bytes32) blockHashes;
+    mapping(uint256 => bytes32) blockHashMapping;
 
     /// @notice Thrown by `parentBlockHash` when the block hash for a given block number is not found.
     error UnknownParentBlockHash(uint256 parentBlockNumber);
@@ -53,7 +53,7 @@ contract Buffer is IBuffer {
 
     /// @inheritdoc IBuffer
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32) {
-        bytes32 _parentBlockHash = blockHashes[parentBlockNumber];
+        bytes32 _parentBlockHash = blockHashMapping[parentBlockNumber];
 
         // QUESTION: should this revert or simply return 0?
         if (_parentBlockHash == 0) {
@@ -64,36 +64,45 @@ contract Buffer is IBuffer {
     }
 
     /// @dev Pushes a block hash to the ring buffer. Can only be called by the aliased pusher contract or chain owners.
-    function receiveHash(uint256 blockNumber, bytes32 blockHash) external {
+    /// @param firstBlockNumber The block number of the first block in the batch.
+    /// @param blockHashes The hashes of the blocks to be pushed. These are assumed to be in contiguous order.
+    function receiveHashes(uint256 firstBlockNumber, bytes32[] calldata blockHashes) external {
         if (msg.sender != systemPusher && msg.sender != aliasedPusher) revert NotPusher();
 
-        // get the pointer position and the value at that position in the number buffer
-        uint256 _bufferPtr = bufferPtr;
-        uint256 valueAtPtr = blockNumberBuffer[_bufferPtr];
+        uint256 startPtr = bufferPtr;
+        uint256 prevPtr = (startPtr + bufferSize - 1) % bufferSize;
+        uint256 prevBlockNumber = blockNumberBuffer[prevPtr];
 
-        // if we are overwriting a block number, delete its hash from the mapping
-        if (valueAtPtr != 0) {
-            blockHashes[valueAtPtr] = 0;
+        // if the previous value in the ring buffer is >= firstBlockNumber, adjust the range we are writing to start from prev + 1
+        // determine the range of block numbers we are writing [writeStart, writeEnd)
+        uint256 writeStart = prevBlockNumber >= firstBlockNumber ? prevBlockNumber + 1 : firstBlockNumber;
+        uint256 writeEnd = firstBlockNumber + blockHashes.length;
 
-            // don't allow pushing out of order
-            // we should really be comparing the prev index
-            // QUESTION: early return or revert here?
-            if (valueAtPtr >= blockNumber) {
-                revert PushedOutOfOrder(valueAtPtr, blockNumber);
-            }
+        // ensure the range is valid
+        if (writeEnd <= writeStart) {
+            // todo: better error here
+            revert PushedOutOfOrder(writeStart, writeEnd);
         }
 
-        // write the new block number into the buffer
-        blockNumberBuffer[_bufferPtr] = blockNumber;
+        // write to the buffer in a loop
+        // todo: there's a potential optimization where we don't write to the buffer every block and instead write a range
+        for (uint256 blockToWrite = writeStart; blockToWrite < writeEnd; blockToWrite++) {
+            uint256 currPtr = (startPtr + blockToWrite - writeStart) % bufferSize;
 
-        // write the new hash into the mapping
-        blockHashes[blockNumber] = blockHash;
+            // if we are overwriting a block number, delete its hash from the mapping
+            uint256 valueAtPtr = blockNumberBuffer[currPtr];
+            if (valueAtPtr != 0) {
+                blockHashMapping[valueAtPtr] = 0;
+            }
+
+            // write the new block number into the buffer
+            blockNumberBuffer[currPtr] = blockToWrite;
+            // write the new hash into the mapping
+            blockHashMapping[blockToWrite] = blockHashes[blockToWrite - firstBlockNumber];
+        }
 
         // increment the pointer
-        bufferPtr = (_bufferPtr + 1) % bufferSize;
-
-        // QUESTION: should we emit an event? 2935 does not
-        // i think not, because it may not make sense to in a native solution
+        bufferPtr = (startPtr + writeEnd - writeStart) % bufferSize;
     }
 }
 
@@ -137,6 +146,8 @@ contract Pusher {
             revert WrongEthAmount(msg.value, gasPriceBid * gasLimit + submissionCost);
         }
 
+        bytes32[] memory blockHashes = new bytes32[](1);
+        blockHashes[0] = blockHash;
         IInbox(inbox).createRetryableTicket{value: msg.value}({
             to: bufferAddress,
             l2CallValue: 0,
@@ -145,7 +156,7 @@ contract Pusher {
             callValueRefundAddress: msg.sender,
             gasLimit: gasLimit,
             maxFeePerGas: gasPriceBid,
-            data: abi.encodeCall(Buffer.receiveHash, (blockNumber, blockHash))
+            data: abi.encodeCall(Buffer.receiveHashes, (blockNumber, blockHashes))
         });
 
         // QUESTION: emit an event?

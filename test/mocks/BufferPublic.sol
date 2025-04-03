@@ -25,7 +25,7 @@ contract BufferPublic is Buffer {
         return bufferPtr;
     }
 
-    function _blockHashes(uint256 blockNumber) external view returns (bytes32) {
-        return blockHashes[blockNumber];
+    function _blockHashMapping(uint256 blockNumber) external view returns (bytes32) {
+        return blockHashMapping[blockNumber];
     }
 }
