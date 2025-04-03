@@ -2,7 +2,6 @@
 pragma solidity ^0.8.13;
 
 import {ArbSys} from "@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol";
-import {ArbOwnerPublic} from "@arbitrum/nitro-contracts/src/precompiles/ArbOwnerPublic.sol";
 import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
 import {ArbitrumChecker} from "@arbitrum/nitro-contracts/src/libraries/ArbitrumChecker.sol";
 import {IInbox} from "@arbitrum/nitro-contracts/src/bridge/IInbox.sol";
@@ -26,8 +25,10 @@ contract Buffer is IBuffer {
     ///      then the amount of time that the buffer covers is equivalent to EIP-2935's.
     uint256 constant bufferSize = 393168;
 
+    /// @dev A system address that is authorized to push hashes to the buffer.
+    address constant systemPusher = address(0xA4B05);
+
     /// @dev The aliased address of the pusher contract on the parent chain.
-    ///      This address + chain owners are authorized to push hashes.
     address immutable aliasedPusher;
 
     /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
@@ -64,7 +65,7 @@ contract Buffer is IBuffer {
 
     /// @dev Pushes a block hash to the ring buffer. Can only be called by the aliased pusher contract or chain owners.
     function receiveHash(uint256 blockNumber, bytes32 blockHash) external {
-        if (msg.sender != aliasedPusher && !ArbOwnerPublic(address(107)).isChainOwner(msg.sender)) revert NotPusher();
+        if (msg.sender != systemPusher && msg.sender != aliasedPusher) revert NotPusher();
 
         // get the pointer position and the value at that position in the number buffer
         uint256 _bufferPtr = bufferPtr;
@@ -75,6 +76,7 @@ contract Buffer is IBuffer {
             blockHashes[valueAtPtr] = 0;
 
             // don't allow pushing out of order
+            // we should really be comparing the prev index
             // QUESTION: early return or revert here?
             if (valueAtPtr >= blockNumber) {
                 revert PushedOutOfOrder(valueAtPtr, blockNumber);
@@ -95,10 +97,15 @@ contract Buffer is IBuffer {
     }
 }
 
+/// @notice The Pusher gets the hash of the previous block and pushes it to the buffer on the child chain via retryable ticket.
 contract Pusher {
+    /// @notice Whether this contract is deployed on an Arbitrum chain.
+    ///         This condition changes the way the block number is retrieved.
     bool public immutable isArbitrum;
+    /// @notice The address of the buffer contract on the child chain.
     address public immutable bufferAddress;
 
+    /// @notice Thrown when the amount of ETH sent to the contract is not equal to the specified retryable ticket cost.
     error WrongEthAmount(uint256 received, uint256 expected);
 
     constructor(address _bufferAddress) {
