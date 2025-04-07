@@ -13,6 +13,10 @@ contract BufferPublic is Buffer {
         return aliasedPusher;
     }
 
+    function _systemPusher() external pure returns (address) {
+        return systemPusher;
+    }
+
     function _blockNumberBuffer(uint256 index) external view returns (uint256) {
         return blockNumberBuffer[index];
     }

@@ -31,8 +31,6 @@ contract Buffer is IBuffer {
     /// @dev The aliased address of the pusher contract on the parent chain.
     address immutable aliasedPusher;
 
-    /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
-    uint256[] blockNumberBuffer;
     /// @dev A pointer into the ring buffer. This is the index of the next block number to be pushed.
     uint256 bufferPtr;
 
@@ -40,12 +38,19 @@ contract Buffer is IBuffer {
     ///      Block hashes are deleted from the mapping when they are overwritten in the ring buffer.
     mapping(uint256 => bytes32) blockHashMapping;
 
+    /// @dev A gap in the storage layout to allow for future storage variables
+    uint256[50] __gap;
+
+    /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
+    ///      Should be the last storage variable declared to maintain flexibility in resizing the buffer.
+    uint256[bufferSize] blockNumberBuffer;
+
     /// @notice Thrown by `parentBlockHash` when the block hash for a given block number is not found.
     error UnknownParentBlockHash(uint256 parentBlockNumber);
     /// @dev Thrown when the caller is not authorized to push hashes.
     error NotPusher();
-    /// @dev Thrown when a block number is pushed out of order.
-    error PushedOutOfOrder(uint256 last, uint256 next);
+    /// @dev Thrown when a given range cannot be pushed to the buffer.
+    error InvalidBlockRange(uint256 last, uint256 startOfRange, uint256 lengthOfRange);
 
     constructor() {
         aliasedPusher = AddressAliasHelper.applyL1ToL2Alias(address(new Pusher(address(this))));
@@ -80,8 +85,7 @@ contract Buffer is IBuffer {
 
         // ensure the range is valid
         if (writeEnd <= writeStart) {
-            // todo: better error here
-            revert PushedOutOfOrder(writeStart, writeEnd);
+            revert InvalidBlockRange(prevBlockNumber, firstBlockNumber, blockHashes.length);
         }
 
         // write to the buffer in a loop
