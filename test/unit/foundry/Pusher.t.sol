@@ -114,8 +114,40 @@ contract BufferTest is BaseTest {
     function testRangeValidityChecking() public {
         _deploy();
 
-        // vm.startPrank(buffer._systemPusher());
-        // vm.expectRevert(Buffer.InvalidBlockRange.selector);
+        // put some stuff in the buffer
+        _putItemsInBuffer(1, 10);
+
+        // cannot push zero length range
+        vm.startPrank(buffer._systemPusher());
+        vm.expectRevert(abi.encodeWithSelector(Buffer.InvalidBlockRange.selector, 10, 11, 0));
+        buffer.receiveHashes(11, new bytes32[](0));
+
+        // cannot push a range whose end <= the last item in the buffer
+        // test <
+        vm.expectRevert(abi.encodeWithSelector(Buffer.InvalidBlockRange.selector, 10, 5, 4));
+        buffer.receiveHashes(5, new bytes32[](4));
+        // test ==
+        vm.expectRevert(abi.encodeWithSelector(Buffer.InvalidBlockRange.selector, 10, 5, 6));
+        buffer.receiveHashes(5, new bytes32[](6));
+        vm.stopPrank();
+
+        // can push a range whose end > the last item in the buffer and start <= the last item in the buffer
+        // test <
+        _putItemsInBuffer(5, 7);
+        // test ==
+        _putItemsInBuffer(11, 2);
+
+        for (uint256 i = 0; i < 12; i++) {
+            assertEq(buffer._blockNumberBuffer(i), i + 1);
+            assertEq(buffer._blockHashMapping(i + 1), keccak256(abi.encode(i + 1)));
+        }
+
+        // we can skip ahead and push a range that starts > the last item in the buffer
+        _putItemsInBuffer(20, 2);
+        assertEq(buffer._blockNumberBuffer(12), 20);
+        assertEq(buffer._blockHashMapping(20), keccak256(abi.encode(20)));
+        assertEq(buffer._blockNumberBuffer(13), 21);
+        assertEq(buffer._blockHashMapping(21), keccak256(abi.encode(21)));
     }
 
     function _putItemsInBuffer(uint256 start, uint256 length) internal {
