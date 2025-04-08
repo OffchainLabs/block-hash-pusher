@@ -26,7 +26,6 @@ contract Pusher {
         isArbitrum = ArbitrumChecker.runningOnArbitrum();
     }
 
-    // we'll only push one hash for now, but we can extend later to push batches up to size 256 if we want
     /// @notice Push the hash of the previous block to the buffer on the child chain specified by inbox
     ///         For custom fee chains, the caller must either set gasPriceBid, gasLimit, and submissionCost to 0 and manually redeem on the child,
     ///         or prefund the chain's inbox with the appropriate amount of fees.
@@ -64,8 +63,7 @@ contract Pusher {
             for (uint256 i = 0; i < 256; i++) {
                 blockHashes[i] = ArbSys(address(100)).arbBlockHash(firstBlockNumber + i);
             }
-        }
-        else {
+        } else {
             firstBlockNumber = block.number - 256;
             for (uint256 i = 0; i < 256; i++) {
                 blockHashes[i] = blockhash(firstBlockNumber + i);
