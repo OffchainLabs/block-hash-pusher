@@ -55,8 +55,9 @@ contract Pusher {
                 tokenTotalFeeAmount: gasLimit * gasPriceBid + submissionCost
             });
         } else {
-            // todo: check msg.value
-
+            if (msg.value != gasLimit * gasPriceBid + submissionCost) {
+                revert IncorrectMsgValue(gasLimit * gasPriceBid + submissionCost, msg.value);
+            }
             IInbox(inbox).createRetryableTicket{value: msg.value}({
                 to: bufferAddress,
                 l2CallValue: 0,
