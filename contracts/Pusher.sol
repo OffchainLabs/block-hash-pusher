@@ -18,9 +18,6 @@ contract Pusher {
     /// @notice Emitted when block hashes are pushed to the buffer.
     event BlockHashesPushed(uint256 firstBlockNumber);
 
-    /// @notice Thrown when the amount of ETH sent to the contract is not equal to the specified retryable ticket cost.
-    error WrongEthAmount(uint256 received, uint256 expected);
-
     constructor(address _bufferAddress) {
         bufferAddress = _bufferAddress;
         isArbitrum = ArbitrumChecker.runningOnArbitrum();
