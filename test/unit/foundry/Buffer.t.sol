@@ -25,9 +25,7 @@ contract BufferTest is BaseTest {
         _deploy();
         _putItemsInBuffer(1, 1);
 
-        assertEq(buffer._blockNumberBuffer(0), 1);
-        assertEq(buffer._blockHashMapping(1), keccak256(abi.encode(1)));
-        _shouldHave(1);
+        _shouldHaveAtIndex(1, 0);
     }
 
     function testCanPushFirstItems() public {
@@ -38,9 +36,7 @@ contract BufferTest is BaseTest {
         _putItemsInBuffer(first, len);
 
         for (uint256 i = 0; i < len; i++) {
-            assertEq(buffer._blockNumberBuffer(i), first + i);
-            assertEq(buffer._blockHashMapping(first + i), keccak256(abi.encode(first + i)));
-            _shouldHave(first + i);
+            _shouldHaveAtIndex(first + i, i);
         }
     }
 
@@ -58,14 +54,10 @@ contract BufferTest is BaseTest {
             uint256 eBlockNumber = buffer._bufferSize() + i + 1;
 
             // should overwrite the first 10 items
-            assertEq(buffer._blockNumberBuffer(i), eBlockNumber);
-
             // should have set the block hash to the correct value
-            assertEq(buffer._blockHashMapping(eBlockNumber), keccak256(abi.encode(eBlockNumber)));
-            _shouldHave(eBlockNumber);
+            _shouldHaveAtIndex(eBlockNumber, i);
 
             // should have evicted the old block hashes
-            assertEq(buffer._blockHashMapping(i + 1), 0);
             _shouldNotHave(i + 1);
         }
     }
@@ -106,34 +98,66 @@ contract BufferTest is BaseTest {
         _putItemsInBuffer(11, 2);
 
         for (uint256 i = 0; i < 12; i++) {
-            assertEq(buffer._blockNumberBuffer(i), i + 1);
-            assertEq(buffer._blockHashMapping(i + 1), keccak256(abi.encode(i + 1)));
-            _shouldHave(i + 1);
+            _shouldHaveAtIndex(i + 1, i);
         }
 
         // we can skip ahead and push a range that starts > the last item in the buffer
         _putItemsInBuffer(20, 2);
-        assertEq(buffer._blockNumberBuffer(12), 20);
-        assertEq(buffer._blockHashMapping(20), keccak256(abi.encode(20)));
-        _shouldHave(20);
-        assertEq(buffer._blockNumberBuffer(13), 21);
-        assertEq(buffer._blockHashMapping(21), keccak256(abi.encode(21)));
-        _shouldHave(21);
+        _shouldHaveAtIndex(20, 12);
+        _shouldHaveAtIndex(21, 13);
         _shouldNotHave(22);
         _shouldNotHave(19);
     }
 
+    function testSystemPusherTakeover() public {
+        _deploy();
+
+        // fill the buffer with 10 items
+        _putItemsInBuffer(1, 10, false);
+
+        // fill the buffer with 10 items using the system pusher
+        _putItemsInBuffer(11, 10, true);
+
+        // make sure everything was put in properly
+        for (uint256 i = 0; i < 20; i++) {
+            _shouldHaveAtIndexWithPusher(i + 1, i, i >= 10);
+        }
+
+        // try to use the aliased pusher to push more items, should fail
+        vm.expectRevert(Buffer.NotPusher.selector);
+        vm.prank(AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
+        buffer.receiveHashes(21, new bytes32[](10));
+
+        // try to use the system pusher to push more items, should work
+        _putItemsInBuffer(21, 10, true);
+    }
+
     function _putItemsInBuffer(uint256 start, uint256 length) internal {
+        _putItemsInBuffer(start, length, false);
+    }
+
+    function _putItemsInBuffer(uint256 start, uint256 length, bool useSystem) internal {
         bytes32[] memory hashes = new bytes32[](length);
         for (uint256 i = 0; i < length; i++) {
             hashes[i] = keccak256(abi.encode(start + i));
         }
-        vm.prank(buffer._systemPusher());
+        vm.prank(useSystem ? buffer._systemPusher() : AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
         buffer.receiveHashes(start, hashes);
     }
 
     function _shouldHave(uint256 blockNumber) internal {
         assertEq(buffer.parentBlockHash(blockNumber), keccak256(abi.encode(blockNumber)));
+    }
+
+    function _shouldHaveAtIndex(uint256 blockNumber, uint256 index) internal {
+        _shouldHave(blockNumber);
+        assertEq(buffer._blockNumberBuffer(index).blockNumber, blockNumber);
+    }
+
+    function _shouldHaveAtIndexWithPusher(uint256 blockNumber, uint256 index, bool systemPusher) internal {
+        _shouldHave(blockNumber);
+        _shouldHaveAtIndex(blockNumber, index);
+        assertEq(buffer._blockNumberBuffer(index).pushedBySystem, systemPusher);
     }
 
     function _shouldNotHave(uint256 blockNumber) internal {

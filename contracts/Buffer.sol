@@ -9,6 +9,11 @@ import {Pusher} from "./Pusher.sol";
 /// @dev    This contract is deployed with CREATE2 on all chains to the same address.
 ///         This contract's bytecode may or may not be overwritten in a future ArbOS upgrade.
 contract Buffer is IBuffer {
+    struct BufferItem {
+        bool pushedBySystem;
+        uint248 blockNumber;
+    }
+
     /// @dev The size of the ring buffer. This is the maximum number of block hashes that can be stored.
     ///      Assuming a parent block time of 250ms and L1 block time of 12s,
     ///      then the amount of time that the buffer covers is equivalent to EIP-2935's.
@@ -32,7 +37,7 @@ contract Buffer is IBuffer {
 
     /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
     ///      Should be the last storage variable declared to maintain flexibility in resizing the buffer.
-    uint256[bufferSize] blockNumberBuffer;
+    BufferItem[bufferSize] blockNumberBuffer;
 
     /// @notice Thrown by `parentBlockHash` when the block hash for a given block number is not found.
     error UnknownParentBlockHash(uint256 parentBlockNumber);
@@ -61,11 +66,18 @@ contract Buffer is IBuffer {
     /// @param firstBlockNumber The block number of the first block in the batch.
     /// @param blockHashes The hashes of the blocks to be pushed. These are assumed to be in contiguous order.
     function receiveHashes(uint256 firstBlockNumber, bytes32[] calldata blockHashes) external {
-        if (msg.sender != systemPusher && msg.sender != aliasedPusher) revert NotPusher();
-
         uint256 startPtr = bufferPtr;
         uint256 prevPtr = (startPtr + bufferSize - 1) % bufferSize;
-        uint256 prevBlockNumber = blockNumberBuffer[prevPtr];
+        BufferItem memory prevBufferItem = blockNumberBuffer[prevPtr];
+        uint256 prevBlockNumber = prevBufferItem.blockNumber;
+
+        // once the system pusher has pushed a block, only the system pusher can push more blocks
+        if (
+            (prevBufferItem.pushedBySystem && msg.sender != systemPusher)
+                || (msg.sender != systemPusher && msg.sender != aliasedPusher)
+        ) {
+            revert NotPusher();
+        }
 
         // if the previous value in the ring buffer is >= firstBlockNumber, adjust the range we are writing to start from prev + 1
         // determine the range of block numbers we are writing [writeStart, writeEnd)
@@ -83,13 +95,15 @@ contract Buffer is IBuffer {
             uint256 currPtr = (startPtr + blockToWrite - writeStart) % bufferSize;
 
             // if we are overwriting a block number, delete its hash from the mapping
-            uint256 valueAtPtr = blockNumberBuffer[currPtr];
+            uint256 valueAtPtr = blockNumberBuffer[currPtr].blockNumber;
             if (valueAtPtr != 0) {
                 blockHashMapping[valueAtPtr] = 0;
             }
 
             // write the new block number into the buffer
-            blockNumberBuffer[currPtr] = blockToWrite;
+            blockNumberBuffer[currPtr] =
+                BufferItem({pushedBySystem: msg.sender == systemPusher, blockNumber: uint248(blockToWrite)});
+
             // write the new hash into the mapping
             blockHashMapping[blockToWrite] = blockHashes[blockToWrite - firstBlockNumber];
         }

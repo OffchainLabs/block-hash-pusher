@@ -17,7 +17,7 @@ contract BufferPublic is Buffer {
         return systemPusher;
     }
 
-    function _blockNumberBuffer(uint256 index) external view returns (uint256) {
+    function _blockNumberBuffer(uint256 index) external view returns (BufferItem memory) {
         return blockNumberBuffer[index];
     }
 
