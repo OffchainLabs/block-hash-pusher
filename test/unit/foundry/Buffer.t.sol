@@ -27,6 +27,7 @@ contract BufferTest is BaseTest {
 
         assertEq(buffer._blockNumberBuffer(0), 1);
         assertEq(buffer._blockHashMapping(1), keccak256(abi.encode(1)));
+        _shouldHave(1);
     }
 
     function testCanPushFirstItems() public {
@@ -39,7 +40,7 @@ contract BufferTest is BaseTest {
         for (uint256 i = 0; i < len; i++) {
             assertEq(buffer._blockNumberBuffer(i), first + i);
             assertEq(buffer._blockHashMapping(first + i), keccak256(abi.encode(first + i)));
-            assertEq(buffer.parentBlockHash(first + i), keccak256(abi.encode(first + i)));
+            _shouldHave(first + i);
         }
     }
 
@@ -61,9 +62,11 @@ contract BufferTest is BaseTest {
 
             // should have set the block hash to the correct value
             assertEq(buffer._blockHashMapping(eBlockNumber), keccak256(abi.encode(eBlockNumber)));
+            _shouldHave(eBlockNumber);
 
             // should have evicted the old block hashes
             assertEq(buffer._blockHashMapping(i + 1), 0);
+            _shouldNotHave(i + 1);
         }
     }
 
@@ -72,9 +75,8 @@ contract BufferTest is BaseTest {
 
         _putItemsInBuffer(1, 1);
 
-        assertEq(buffer.parentBlockHash(1), keccak256(abi.encode(1)));
-        vm.expectRevert(abi.encodeWithSelector(Buffer.UnknownParentBlockHash.selector, 2));
-        buffer.parentBlockHash(2);
+        _shouldHave(1);
+        _shouldNotHave(2);
     }
 
     function testRangeValidityChecking() public {
@@ -106,14 +108,19 @@ contract BufferTest is BaseTest {
         for (uint256 i = 0; i < 12; i++) {
             assertEq(buffer._blockNumberBuffer(i), i + 1);
             assertEq(buffer._blockHashMapping(i + 1), keccak256(abi.encode(i + 1)));
+            _shouldHave(i + 1);
         }
 
         // we can skip ahead and push a range that starts > the last item in the buffer
         _putItemsInBuffer(20, 2);
         assertEq(buffer._blockNumberBuffer(12), 20);
         assertEq(buffer._blockHashMapping(20), keccak256(abi.encode(20)));
+        _shouldHave(20);
         assertEq(buffer._blockNumberBuffer(13), 21);
         assertEq(buffer._blockHashMapping(21), keccak256(abi.encode(21)));
+        _shouldHave(21);
+        _shouldNotHave(22);
+        _shouldNotHave(19);
     }
 
     function _putItemsInBuffer(uint256 start, uint256 length) internal {
@@ -123,5 +130,14 @@ contract BufferTest is BaseTest {
         }
         vm.prank(buffer._systemPusher());
         buffer.receiveHashes(start, hashes);
+    }
+
+    function _shouldHave(uint256 blockNumber) internal {
+        assertEq(buffer.parentBlockHash(blockNumber), keccak256(abi.encode(blockNumber)));
+    }
+
+    function _shouldNotHave(uint256 blockNumber) internal {
+        vm.expectRevert(abi.encodeWithSelector(Buffer.UnknownParentBlockHash.selector, blockNumber));
+        buffer.parentBlockHash(blockNumber);
     }
 }
