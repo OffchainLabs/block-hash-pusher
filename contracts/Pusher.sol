@@ -35,10 +35,6 @@ contract Pusher {
     /// @param gasLimit The gas limit for the transaction.
     /// @param submissionCost The cost of submitting the transaction.
     function pushHash(address inbox, uint256 gasPriceBid, uint256 gasLimit, uint256 submissionCost) external payable {
-        if (gasPriceBid * gasLimit + submissionCost != msg.value) {
-            revert WrongEthAmount(msg.value, gasPriceBid * gasLimit + submissionCost);
-        }
-
         (uint256 firstBlockNumber, bytes32[] memory blockHashes) = _buildBlockHashArray();
 
         IInbox(inbox).createRetryableTicket{value: msg.value}({
