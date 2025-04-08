@@ -5,6 +5,7 @@ import {ArbSys} from "@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol";
 import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
 import {ArbitrumChecker} from "@arbitrum/nitro-contracts/src/libraries/ArbitrumChecker.sol";
 import {IInbox} from "@arbitrum/nitro-contracts/src/bridge/IInbox.sol";
+import {IERC20Inbox} from "@arbitrum/nitro-contracts/src/bridge/IERC20Inbox.sol";
 import {Buffer} from "./Buffer.sol";
 
 /// @notice The Pusher gets the hash of the previous 256 blocks and pushes them to the buffer on the child chain via retryable ticket.
@@ -17,6 +18,9 @@ contract Pusher {
 
     /// @notice Emitted when block hashes are pushed to the buffer.
     event BlockHashesPushed(uint256 firstBlockNumber);
+
+    /// @notice Thrown when incorrect msg.value is provided
+    error IncorrectMsgValue(uint256 expected, uint256 provided);
 
     constructor(address _bufferAddress) {
         bufferAddress = _bufferAddress;
@@ -31,19 +35,40 @@ contract Pusher {
     /// @param gasPriceBid The gas price bid for the transaction.
     /// @param gasLimit The gas limit for the transaction.
     /// @param submissionCost The cost of submitting the transaction.
-    function pushHash(address inbox, uint256 gasPriceBid, uint256 gasLimit, uint256 submissionCost) external payable {
+    /// @param isERC20Inbox Whether the inbox is an ERC20 inbox.
+    function pushHash(address inbox, uint256 gasPriceBid, uint256 gasLimit, uint256 submissionCost, bool isERC20Inbox)
+        external
+        payable
+    {
         (uint256 firstBlockNumber, bytes32[] memory blockHashes) = _buildBlockHashArray();
 
-        IInbox(inbox).createRetryableTicket{value: msg.value}({
-            to: bufferAddress,
-            l2CallValue: 0,
-            maxSubmissionCost: submissionCost,
-            excessFeeRefundAddress: msg.sender,
-            callValueRefundAddress: msg.sender,
-            gasLimit: gasLimit,
-            maxFeePerGas: gasPriceBid,
-            data: abi.encodeCall(Buffer.receiveHashes, (firstBlockNumber, blockHashes))
-        });
+        if (isERC20Inbox) {
+            IERC20Inbox(inbox).createRetryableTicket({
+                to: bufferAddress,
+                l2CallValue: 0,
+                maxSubmissionCost: submissionCost,
+                excessFeeRefundAddress: msg.sender,
+                callValueRefundAddress: msg.sender,
+                gasLimit: gasLimit,
+                maxFeePerGas: gasPriceBid,
+                data: abi.encodeCall(Buffer.receiveHashes, (firstBlockNumber, blockHashes)),
+                tokenTotalFeeAmount: gasLimit * gasPriceBid + submissionCost
+            });
+        } else {
+            if (msg.value != gasLimit * gasPriceBid + submissionCost) {
+                revert IncorrectMsgValue(gasLimit * gasPriceBid + submissionCost, msg.value);
+            }
+            IInbox(inbox).createRetryableTicket{value: msg.value}({
+                to: bufferAddress,
+                l2CallValue: 0,
+                maxSubmissionCost: submissionCost,
+                excessFeeRefundAddress: msg.sender,
+                callValueRefundAddress: msg.sender,
+                gasLimit: gasLimit,
+                maxFeePerGas: gasPriceBid,
+                data: abi.encodeCall(Buffer.receiveHashes, (firstBlockNumber, blockHashes))
+            });
+        }
 
         emit BlockHashesPushed(firstBlockNumber);
     }

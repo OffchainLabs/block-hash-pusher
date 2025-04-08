@@ -8,6 +8,7 @@ import {IInbox} from "@arbitrum/nitro-contracts/src/bridge/IInbox.sol";
 import {ArbSys} from "@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol";
 import {Buffer} from "contracts/Buffer.sol";
 import {MockInbox} from "test/mocks/MockInbox.sol";
+// todo: test eth amounts
 
 contract PusherTest is BaseTest {
     uint256 constant rollTo = 500;
@@ -52,7 +53,8 @@ contract PusherTest is BaseTest {
             inbox: mockInbox,
             gasPriceBid: gasPriceBid,
             gasLimit: gasLimit,
-            submissionCost: submissionCost
+            submissionCost: submissionCost,
+            isERC20Inbox: false
         });
     }
 }
