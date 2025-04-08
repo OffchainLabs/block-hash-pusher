@@ -53,7 +53,8 @@ contract PusherTest is BaseTest {
             inbox: mockInbox,
             gasPriceBid: gasPriceBid,
             gasLimit: gasLimit,
-            submissionCost: submissionCost
+            submissionCost: submissionCost,
+            isERC20Inbox: false
         });
     }
 }

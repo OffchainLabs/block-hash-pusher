@@ -4,6 +4,7 @@ import { OrbitTestSetup, TestSetup, testSetup } from './testSetup'
 import { ethers, Signer, Wallet } from 'ethers'
 import {
   L1ToL2MessageGasEstimator,
+  L1ToL2MessageStatus,
   L1ToL2MessageWriter,
 } from '../../lib/arbitrum-sdk/src'
 import { L1ContractCallTransactionReceipt } from '../../lib/arbitrum-sdk/src/lib/message/L1Transaction'
@@ -118,7 +119,6 @@ describe('Pusher & Buffer', () => {
 
     describe('Pushing to L2', () => {
       it('should push 256 blocks to L2, and successfully auto redeem', async () => {
-
         // estimate gas
         const depositFunc = (
           depositParams: OmitTyped<L1ToL2MessageGasParams, 'deposit'>
@@ -131,6 +131,7 @@ describe('Pusher & Buffer', () => {
                 depositParams.maxFeePerGas.toBigInt(),
                 depositParams.gasLimit.toBigInt(),
                 depositParams.maxSubmissionCost.toBigInt(),
+                false,
               ]
             ),
             to: pusherAddress,
@@ -143,15 +144,17 @@ describe('Pusher & Buffer', () => {
         const gasEstimator = new L1ToL2MessageGasEstimator(setup.l2Provider.v5)
         const estimates = await gasEstimator.populateFunctionParams(
           depositFunc,
-          setup.l1Provider.v5,
+          setup.l1Provider.v5
         )
-        
+
         // execute transaction
-        const tx = L1ContractCallTransactionReceipt.monkeyPatchContractCallWait(await setup.l1Signer.v5.sendTransaction({
-          to: estimates.to,
-          data: estimates.data,
-          value: estimates.value,
-        }))
+        const tx = L1ContractCallTransactionReceipt.monkeyPatchContractCallWait(
+          await setup.l1Signer.v5.sendTransaction({
+            to: estimates.to,
+            data: estimates.data,
+            value: estimates.value,
+          })
+        )
         const receipt = await tx.wait()
 
         // wait for the message to be processed on L2
@@ -161,7 +164,54 @@ describe('Pusher & Buffer', () => {
         const buffer = Buffer__factory.connect(bufferAddress, setup.l2Signer)
         for (let i = 0; i < 256; i++) {
           const parentBlockNumber = receipt.blockNumber - 256 + i
-          const blockHash = (await setup.l1Provider.getBlock(parentBlockNumber))!.hash
+          const blockHash = (await setup.l1Provider.getBlock(
+            parentBlockNumber
+          ))!.hash
+          const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
+          expect(pushedHash).to.eq(blockHash, `Block hash ${i} does not match`)
+        }
+      })
+    })
+
+    describe('Pushing to L3', () => {
+      it('should push 256 blocks to L3, and require manual redeem', async () => {
+        const tx = L1ContractCallTransactionReceipt.monkeyPatchContractCallWait(
+          await setup.l2Signer.v5.sendTransaction({
+            to: pusherAddress,
+            data: Pusher__factory.createInterface().encodeFunctionData(
+              'pushHash',
+              [setup.l3Network.ethBridge.inbox, 0, 0, 0, true]
+            ),
+          })
+        )
+        const rec = await tx.wait()
+
+        const result = await rec.waitForL2(setup.l3Provider.v5)
+
+        expect(result.status).to.eq(
+          L1ToL2MessageStatus.FUNDS_DEPOSITED_ON_L2,
+          'incorrect message status'
+        )
+
+        // manually redeem the message
+        const writer = new L1ToL2MessageWriter(
+          setup.l3Signer.v5,
+          result.message.chainId,
+          result.message.sender,
+          result.message.messageNumber,
+          result.message.l1BaseFee,
+          result.message.messageData
+        )
+
+        const redemption = await writer.redeem()
+        await redemption.wait()
+
+        const buffer = Buffer__factory.connect(bufferAddress, setup.l3Signer)
+        for (let i = 0; i < 256; i++) {
+          const parentBlockNumber = rec.blockNumber - 256 + i
+          const blockHash = (await setup.l2Provider.getBlock(
+            parentBlockNumber
+          ))!.hash
           const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
           expect(pushedHash).to.eq(blockHash, `Block hash ${i} does not match`)
         }
