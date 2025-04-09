@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.28;
 
 /// @notice This contract is a ring buffer that stores parent chain block hashes.
 /// @dev    This is the guaranteed, public interface for the buffer contract. Future versions may add more functions.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.28;
 
 import {ArbSys} from "@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol";
 import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
@@ -10,6 +10,9 @@ import {Buffer} from "./Buffer.sol";
 
 /// @notice The Pusher gets the hash of the previous 256 blocks and pushes them to the buffer on the child chain via retryable ticket.
 contract Pusher {
+    /// @notice The number of hashes to push per transaction.
+    uint256 public constant BATCH_SIZE = 256;
+
     /// @notice Whether this contract is deployed on an Arbitrum chain.
     ///         This condition changes the way the block number is retrieved.
     bool public immutable isArbitrum;
@@ -74,16 +77,16 @@ contract Pusher {
     }
 
     /// @dev Build an array of the last 256 block hashes
-    function _buildBlockHashArray() internal view returns (uint256 firstBlockNumber, bytes32[] memory blockHashes) {
-        blockHashes = new bytes32[](256);
+    function _buildBlockHashArray() internal returns (uint256 firstBlockNumber, bytes32[] memory blockHashes) {
+        blockHashes = new bytes32[](BATCH_SIZE);
         if (isArbitrum) {
-            firstBlockNumber = ArbSys(address(100)).arbBlockNumber() - 256;
-            for (uint256 i = 0; i < 256; i++) {
+            firstBlockNumber = ArbSys(address(100)).arbBlockNumber() - BATCH_SIZE;
+            for (uint256 i = 0; i < BATCH_SIZE; i++) {
                 blockHashes[i] = ArbSys(address(100)).arbBlockHash(firstBlockNumber + i);
             }
         } else {
-            firstBlockNumber = block.number - 256;
-            for (uint256 i = 0; i < 256; i++) {
+            firstBlockNumber = block.number - BATCH_SIZE;
+            for (uint256 i = 0; i < BATCH_SIZE; i++) {
                 blockHashes[i] = blockhash(firstBlockNumber + i);
             }
         }

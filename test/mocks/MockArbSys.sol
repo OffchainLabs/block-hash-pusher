@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.28;
 
 contract MockArbSys {
     function arbOSVersion() external pure returns (uint256) {
