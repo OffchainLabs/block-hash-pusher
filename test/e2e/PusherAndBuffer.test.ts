@@ -128,6 +128,7 @@ describe('Pusher & Buffer', () => {
               'pushHash',
               [
                 setup.l2Network.ethBridge.inbox,
+                256,
                 depositParams.maxFeePerGas.toBigInt(),
                 depositParams.gasLimit.toBigInt(),
                 depositParams.maxSubmissionCost.toBigInt(),
@@ -180,7 +181,7 @@ describe('Pusher & Buffer', () => {
             to: pusherAddress,
             data: Pusher__factory.createInterface().encodeFunctionData(
               'pushHash',
-              [setup.l3Network.ethBridge.inbox, 0, 0, 0, true]
+              [setup.l3Network.ethBridge.inbox, 256, 0, 0, 0, true]
             ),
           })
         )

@@ -63,7 +63,8 @@ contract Buffer is IBuffer {
         return _parentBlockHash;
     }
 
-    /// @dev Pushes a block hash to the ring buffer. Can only be called by the aliased pusher contract or chain owners.
+    /// @dev Pushes some block hashes to the ring buffer. Can only be called by the aliased pusher contract or chain owners.
+    ///      The last block in the buffer must be less than the last block being pushed.
     /// @param firstBlockNumber The block number of the first block in the batch.
     /// @param blockHashes The hashes of the blocks to be pushed. These are assumed to be in contiguous order.
     function receiveHashes(uint256 firstBlockNumber, bytes32[] calldata blockHashes) external {
