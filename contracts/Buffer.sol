@@ -32,7 +32,8 @@ contract Buffer is IBuffer {
     ///      Block hashes are deleted from the mapping when they are overwritten in the ring buffer.
     mapping(uint256 => bytes32) blockHashMapping;
 
-    /// @dev A gap in the storage layout to allow for future storage variables
+    /// @dev A gap in the storage layout to allow for future storage variables.
+    ///      It's unlikely this will be needed.
     uint256[50] __gap;
 
     /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
@@ -90,7 +91,11 @@ contract Buffer is IBuffer {
         }
 
         // write to the buffer in a loop
-        // todo: there's a potential optimization where we don't write to the buffer every block and instead write a range
+        // todo: there's a potential optimization where we don't write to the buffer every block and instead write a range.
+        // i think it is probably not worth the complexity, at least in arb1's case.
+        // rationale being that we'll get a new batch of hashes after every sequencer batch, which happens every few minutes.
+        // on orbit chains with lower batch posting frequency, this optimization may be worth it if ArbOS is backfilling.
+        // on the other hand though, the pushing transaction will not actually consume gas
         for (uint256 blockToWrite = writeStart; blockToWrite < writeEnd; blockToWrite++) {
             uint256 currPtr = (startPtr + blockToWrite - writeStart) % bufferSize;
 
