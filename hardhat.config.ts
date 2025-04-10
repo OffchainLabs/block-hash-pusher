@@ -22,11 +22,6 @@ const config: HardhatUserConfig = {
     //   },
     // },
   },
-  networks: {
-    fork: {
-      url: process.env.FORK_URL || 'http://localhost:8545',
-    },
-  },
 }
 
 function getSolidityConfigFromFoundryToml(
