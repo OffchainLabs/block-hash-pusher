@@ -100,6 +100,7 @@ describe('Pusher & Buffer', () => {
         setup.l1Signer
       )
       pusherAddress = ethers.getCreateAddress({ from: bufferAddress, nonce: 1 })
+      console.log(bufferAddress, pusherAddress)
       // require code at the addresses
       expect(await setup.l1Provider.getCode(bufferAddress)).to.not.eq('0x')
       expect(await setup.l1Provider.getCode(pusherAddress)).to.not.eq('0x')

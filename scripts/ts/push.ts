@@ -4,11 +4,18 @@ import { program } from '@commander-js/extra-typings'
 
 import { Pusher__factory } from '../../typechain-types'
 import { DoubleProvider, DoubleWallet, getEnv } from '../template/util'
-import { parseIntThrowing } from './util'
+import { getSdkEthBridge, parseIntThrowing } from './util'
 import { OmitTyped } from '../../lib/arbitrum-sdk/src/lib/utils/types'
 import { L1ToL2MessageGasParams } from '../../lib/arbitrum-sdk/src/lib/message/L1ToL2MessageCreator'
-import { L1ToL2MessageGasEstimator } from '../../lib/arbitrum-sdk/src'
+import {
+  addCustomNetwork,
+  L1ToL2MessageGasEstimator,
+} from '../../lib/arbitrum-sdk/src'
 import { BigNumber } from 'ethers-v5'
+import {
+  l1Networks,
+  l2Networks,
+} from '../../lib/arbitrum-sdk/src/lib/dataEntities/networks'
 
 program
   .argument('<inbox>', 'The inbox address to push through')
@@ -36,12 +43,15 @@ program
       parentProvider
     )
 
+    const pusherAddress = getEnv('PUSHER_ADDRESS')
+    const pusherContract = Pusher__factory.connect(pusherAddress, parentSigner)
+
     if (options.minElapsed) {
       // see if we should skip or go ahead
       const latestBlock = await parentSigner.provider.getBlockNumber()
 
       const logs = await parentSigner.provider.getLogs({
-        address: inbox,
+        address: pusherAddress,
         topics: [
           Pusher__factory.createInterface().getEvent('BlockHashesPushed')
             .topicHash,
@@ -64,9 +74,6 @@ program
       options.manualRedeem = true
     }
 
-    const pusherAddress = getEnv('PUSHER_ADDRESS')
-    const pusherContract = Pusher__factory.connect(pusherAddress, parentSigner)
-
     // default gas estimates
     let estimates: L1ToL2MessageGasParams = {
       maxSubmissionCost: BigNumber.from(0),
@@ -75,6 +82,63 @@ program
       deposit: BigNumber.from(0),
     }
     if (!options.manualRedeem) {
+      const childChainId = parseInt(
+        (await childProvider.getNetwork()).chainId.toString()
+      )
+      const parentChainId = parseInt(
+        (await parentProvider.getNetwork()).chainId.toString()
+      )
+
+      // add custom network through sdk if required
+      if (!l2Networks[childChainId]) {
+        addCustomNetwork({
+          customL1Network:
+            l1Networks[parentChainId] || l2Networks[parentChainId]
+              ? undefined
+              : {
+                  isArbitrum: false,
+                  chainID: parentChainId,
+                  name: 'parentChain',
+                  explorerUrl: '',
+                  isCustom: true,
+                  blockTime: 0,
+                  partnerChainIDs: [childChainId],
+                },
+          customL2Network: {
+            tokenBridge: {
+              l1GatewayRouter: '',
+              l2GatewayRouter: '',
+              l1ERC20Gateway: '',
+              l2ERC20Gateway: '',
+              l1CustomGateway: '',
+              l2CustomGateway: '',
+              l1WethGateway: '',
+              l2WethGateway: '',
+              l2Weth: '',
+              l1Weth: '',
+              l1ProxyAdmin: '',
+              l2ProxyAdmin: '',
+              l1MultiCall: '',
+              l2Multicall: '',
+            },
+            ethBridge: await getSdkEthBridge(inbox, parentProvider),
+            partnerChainID: parentChainId,
+            isArbitrum: true,
+            confirmPeriodBlocks: 0,
+            retryableLifetimeSeconds: 0,
+            nitroGenesisBlock: 0,
+            nitroGenesisL1Block: 0,
+            depositTimeout: 0,
+            chainID: childChainId,
+            name: 'childChain',
+            explorerUrl: '',
+            isCustom: true,
+            blockTime: 0,
+            partnerChainIDs: [],
+          },
+        })
+      }
+
       // estimate gas
       // we can assume non custom fee child chain because we checked for it above
       const estimationFunc = (
@@ -112,10 +176,11 @@ program
       estimates.maxFeePerGas.toBigInt(),
       estimates.gasLimit.toBigInt(),
       estimates.maxSubmissionCost.toBigInt(),
-      options.isCustomFee || false
+      options.isCustomFee || false,
+      { value: estimates.deposit.toBigInt() }
     )
 
-    await tx.wait()
     console.log('Push transaction hash:', tx.hash)
+    await tx.wait()
   })
   .parse()
