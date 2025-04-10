@@ -20,7 +20,7 @@ contract Pusher {
     address public immutable bufferAddress;
 
     /// @notice Emitted when block hashes are pushed to the buffer.
-    event BlockHashesPushed(uint256 firstBlockNumber, uint256 batchSize);
+    event BlockHashesPushed(uint256 firstBlockNumber);
 
     /// @notice Thrown when incorrect msg.value is provided
     error IncorrectMsgValue(uint256 expected, uint256 provided);
@@ -81,7 +81,7 @@ contract Pusher {
             });
         }
 
-        emit BlockHashesPushed(firstBlockNumber, batchSize);
+        emit BlockHashesPushed(firstBlockNumber);
     }
 
     /// @dev Build an array of the last 256 block hashes
