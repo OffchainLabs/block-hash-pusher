@@ -112,7 +112,7 @@ program
       estimates.maxFeePerGas.toBigInt(),
       estimates.gasLimit.toBigInt(),
       estimates.maxSubmissionCost.toBigInt(),
-      options.isCustomFee || false,
+      options.isCustomFee || false
     )
 
     await tx.wait()
