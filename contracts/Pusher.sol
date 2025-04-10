@@ -45,7 +45,7 @@ contract Pusher {
     /// @param isERC20Inbox Whether the inbox is an ERC20 inbox.
     function pushHash(
         address inbox,
-        uint256 batchSize,
+        uint256 batchSize, // todo: this should probably be removed and forced to 1. weird race conditions can come up with user choice
         uint256 gasPriceBid,
         uint256 gasLimit,
         uint256 submissionCost,
