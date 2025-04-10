@@ -22,7 +22,7 @@
     "gas-snapshot": "forge snapshot --match-path \"test/unit/**/*.t.sol\"",
     "fix": "yarn format; yarn test:sigs; yarn test:storage; yarn gas-snapshot",
     "run:deploy": "forge script ./scripts/foundry/Deploy.s.sol",
-    "run:push": "ts-node scripts/ts/push.ts"
+    "run:push": "ts-node scripts/ts/pushScript.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",

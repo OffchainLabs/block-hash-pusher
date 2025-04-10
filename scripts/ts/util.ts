@@ -1,6 +1,5 @@
 import { ethers } from 'ethers'
 import { EthBridge } from '../../lib/arbitrum-sdk/src/lib/dataEntities/networks'
-import { IInbox__factory } from '../../typechain-types'
 import { DoubleProvider } from '../template/util'
 
 export function parseIntThrowing(x: string): number {
@@ -45,4 +44,3 @@ export async function getSdkEthBridge(
     rollup,
   }
 }
-
