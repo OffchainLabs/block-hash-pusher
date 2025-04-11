@@ -1,7 +1,7 @@
 import dotenv from 'dotenv'
 dotenv.config()
 import { program } from '@commander-js/extra-typings'
-import { pushCommand } from './lib/pushCommand'
+import { push } from './lib/push'
 import { DoubleProvider, DoubleWallet, getEnv } from '../template/util'
 import { parseIntThrowing } from './util'
 
@@ -24,12 +24,15 @@ program
     'Disable payment for auto redeem on parent chain. Always set for custom fee child chains'
   )
   .action(async (inbox, numBlocks, options) => {
-    pushCommand(
+    push(
       new DoubleWallet(
         getEnv('PARENT_PRIVATE_KEY'),
         new DoubleProvider(getEnv('PARENT_RPC_URL'))
       ),
-      new DoubleProvider(getEnv('CHILD_RPC_URL')),
+      new DoubleWallet(
+        getEnv('CHILD_PRIVATE_KEY'),
+        new DoubleProvider(getEnv('CHILD_RPC_URL'))
+      ),
       getEnv('PUSHER_ADDRESS'),
       inbox,
       parseIntThrowing(numBlocks),

@@ -7,9 +7,19 @@ import {
   L1ToL2MessageWriter,
 } from '../../lib/arbitrum-sdk/src'
 import { L1ContractCallTransactionReceipt } from '../../lib/arbitrum-sdk/src/lib/message/L1Transaction'
-import { pushCommand } from '../../scripts/ts/lib/pushCommand'
+import { push } from '../../scripts/ts/lib/push'
 
 const CREATE2_FACTORY = '0x32ea7F2A6f7a2d442bADf82fEA569BA33aD97DD6'
+
+class FakeLogger {
+  logs: string[] = []
+  log(message: string) {
+    this.logs.push(message)
+  }
+  logsContain(substr: string) {
+    return this.logs.some(log => log.includes(substr))
+  }
+}
 
 // function to deploy a create2 factory
 async function deployCreate2Factory(fundedSigner: Signer) {
@@ -98,6 +108,7 @@ describe('Pusher & Buffer', () => {
         setup.l1Signer
       )
       pusherAddress = ethers.getCreateAddress({ from: bufferAddress, nonce: 1 })
+      console.log(bufferAddress, pusherAddress)
       // require code at the addresses
       expect(await setup.l1Provider.getCode(bufferAddress)).to.not.eq('0x')
       expect(await setup.l1Provider.getCode(pusherAddress)).to.not.eq('0x')
@@ -117,22 +128,21 @@ describe('Pusher & Buffer', () => {
 
     describe('Pushing to L2', () => {
       it('should push 256 blocks to L2, and successfully auto redeem', async () => {
-        const receipt = new L1ContractCallTransactionReceipt(
-          await setup.l1Provider.v5.getTransactionReceipt(
-            (await pushCommand(
-              setup.l1Signer,
-              setup.l2Provider,
-              pusherAddress,
-              setup.l2Network.ethBridge.inbox,
-              256,
-              {},
-              () => {}
-            ))!.hash
-          )
-        )
+        const logger = new FakeLogger()
+        const receipt = (await push(
+          setup.l1Signer,
+          setup.l2Signer,
+          pusherAddress,
+          setup.l2Network.ethBridge.inbox,
+          256,
+          {},
+          logger.log.bind(logger)
+        ))!
 
-        // wait for the message to be processed on L2
-        await receipt.waitForL2(setup.l2Provider.v5)
+        // should auto redeem
+        if (!logger.logsContain('automatically redeemed')) {
+          throw new Error('auto redeem not found in logs')
+        }
 
         // check that we've pushed some block hashes
         const buffer = Buffer__factory.connect(bufferAddress, setup.l2Signer)
@@ -149,41 +159,23 @@ describe('Pusher & Buffer', () => {
 
     describe('Pushing to L3', () => {
       it('should push 256 blocks to L3, and require manual redeem', async () => {
-        const receipt = new L1ContractCallTransactionReceipt(
-          await setup.l2Provider.v5.getTransactionReceipt(
-            (await pushCommand(
-              setup.l2Signer,
-              setup.l3Provider,
-              pusherAddress,
-              setup.l3Network.ethBridge.inbox,
-              256,
-              {
-                isCustomFee: true,
-              },
-              () => {}
-            ))!.hash
-          )
-        )
+        const logger = new FakeLogger()
+        const receipt = (await push(
+          setup.l2Signer,
+          setup.l3Signer,
+          pusherAddress,
+          setup.l3Network.ethBridge.inbox,
+          256,
+          {
+            isCustomFee: true,
+          },
+          logger.log.bind(logger)
+        ))!
 
-        const result = await receipt.waitForL2(setup.l3Provider.v5)
-
-        expect(result.status).to.eq(
-          L1ToL2MessageStatus.FUNDS_DEPOSITED_ON_L2,
-          'incorrect message status'
-        )
-
-        // manually redeem the message
-        const writer = new L1ToL2MessageWriter(
-          setup.l3Signer.v5,
-          result.message.chainId,
-          result.message.sender,
-          result.message.messageNumber,
-          result.message.l1BaseFee,
-          result.message.messageData
-        )
-
-        const redemption = await writer.redeem()
-        await redemption.wait()
+        // should require manual redeem
+        if (!logger.logsContain('Manual redeem complete')) {
+          throw new Error('manual redeem not found in logs')
+        }
 
         const buffer = Buffer__factory.connect(bufferAddress, setup.l3Signer)
         for (let i = 0; i < 256; i++) {
