@@ -14,9 +14,7 @@ import {
   L1ToL2MessageStatus,
 } from '../../../lib/arbitrum-sdk/src'
 import { L1ContractCallTransactionReceipt } from '../../../lib/arbitrum-sdk/src/lib/message/L1Transaction'
-import {
-  L1ToL2MessageWriter,
-} from '../../../lib/arbitrum-sdk/src/lib/message/L1ToL2Message'
+import { L1ToL2MessageWriter } from '../../../lib/arbitrum-sdk/src/lib/message/L1ToL2Message'
 
 export async function push(
   parentSigner: DoubleWallet,
@@ -179,8 +177,7 @@ export async function push(
   const waitResult = await receipt.waitForL2(childSigner.v5)
   if (waitResult.status === L1ToL2MessageStatus.REDEEMED) {
     log('Message automatically redeemed')
-  }
-  else if (waitResult.status === L1ToL2MessageStatus.FUNDS_DEPOSITED_ON_L2) {
+  } else if (waitResult.status === L1ToL2MessageStatus.FUNDS_DEPOSITED_ON_L2) {
     log('Attempting manual redeem')
     const message = (await receipt.getL1ToL2Messages(childSigner.v5))[0]
     const writer = new L1ToL2MessageWriter(
@@ -194,11 +191,8 @@ export async function push(
     const redemption = await writer.redeem()
     await redemption.wait()
     log('Manual redeem complete')
-  }
-  else {
-    throw new Error(
-      `Unexpected Message Status: ${waitResult.status}`
-    )
+  } else {
+    throw new Error(`Unexpected Message Status: ${waitResult.status}`)
   }
 
   return receipt
