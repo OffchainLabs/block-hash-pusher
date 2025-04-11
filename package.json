@@ -21,7 +21,8 @@
     "test:storage": "./test/storage/test-storage.bash",
     "gas-snapshot": "forge snapshot --match-path \"test/unit/**/*.t.sol\"",
     "fix": "yarn format; yarn test:sigs; yarn test:storage; yarn gas-snapshot",
-    "deploy": "forge script ./scripts/foundry/Deploy.s.sol"
+    "run:deploy": "forge script ./scripts/foundry/Deploy.s.sol",
+    "run:push": "ts-node scripts/ts/pushScript.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
@@ -55,6 +56,9 @@
     "typescript": ">=4.5.0"
   },
   "dependencies": {
-    "@arbitrum/nitro-contracts": "^3.0.0"
+    "@arbitrum/nitro-contracts": "^3.0.0",
+    "@commander-js/extra-typings": "^13.1.0",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7"
   }
 }
