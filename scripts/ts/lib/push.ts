@@ -29,12 +29,12 @@ export async function push(
     isCustomFee?: boolean
     manualRedeem?: boolean
   },
-  log: (message: string) => void
+  log: (message: string) => void // custom log function so tests can check logs and reduce noise
 ): Promise<L1ContractCallTransactionReceipt | undefined> {
   const pusherContract = Pusher__factory.connect(pusherAddress, parentSigner)
 
+  // see if we should skip or go ahead
   if (options.minElapsed) {
-    // see if we should skip or go ahead
     const latestBlock = await parentSigner.provider.getBlockNumber()
 
     const logs = await parentSigner.provider.getLogs({
