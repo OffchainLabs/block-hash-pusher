@@ -25,16 +25,16 @@ contract Buffer is IBuffer {
     /// @dev The aliased address of the pusher contract on the parent chain.
     address immutable aliasedPusher;
 
+    /// @dev A gap in the storage layout to allow for future storage variables.
+    ///      It's unlikely this will be needed.
+    uint256[50] __gap;
+
     /// @dev A pointer into the ring buffer. This is the index of the next block number to be pushed.
     uint256 bufferPtr;
 
     /// @dev Maps block numbers to their hashes. This is a mapping of block number to block hash.
     ///      Block hashes are deleted from the mapping when they are overwritten in the ring buffer.
     mapping(uint256 => bytes32) blockHashMapping;
-
-    /// @dev A gap in the storage layout to allow for future storage variables.
-    ///      It's unlikely this will be needed.
-    uint256[50] __gap;
 
     /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
     ///      Should be the last storage variable declared to maintain flexibility in resizing the buffer.
