@@ -1,6 +1,6 @@
 import { BigNumber } from 'ethers-v5'
 import { L1ToL2MessageGasParams } from '../../../lib/arbitrum-sdk/src/lib/message/L1ToL2MessageCreator'
-import { Pusher__factory } from '../../../typechain-types'
+import { IPusher__factory } from '../../../typechain-types'
 import { DoubleWallet } from '../../template/util'
 import { getSdkEthBridge } from '../util'
 import {
@@ -28,7 +28,7 @@ export async function push(
   },
   log: (message: string) => void // custom log function so tests can check logs and reduce noise
 ): Promise<L1ContractCallTransactionReceipt | undefined> {
-  const pusherContract = Pusher__factory.connect(pusherAddress, parentSigner)
+  const pusherContract = IPusher__factory.connect(pusherAddress, parentSigner)
 
   // see if we should skip or go ahead
   if (options.minElapsed) {
@@ -37,7 +37,7 @@ export async function push(
     const logs = await parentSigner.provider.getLogs({
       address: pusherAddress,
       topics: [
-        Pusher__factory.createInterface().getEvent('BlockHashPushed').topicHash,
+        IPusher__factory.createInterface().getEvent('BlockHashPushed').topicHash,
       ],
       fromBlock: latestBlock - options.minElapsed,
     })
