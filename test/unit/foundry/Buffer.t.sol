@@ -17,7 +17,7 @@ contract BufferTest is BaseTest {
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
         buffer.receiveHashes(1, new bytes32[](1));
 
-        vm.prank(buffer._systemPusher());
+        vm.prank(buffer.systemPusher());
         buffer.receiveHashes(1, new bytes32[](2));
     }
 
@@ -44,14 +44,14 @@ contract BufferTest is BaseTest {
         _deploy();
 
         // fill everything but the last 10 items
-        _putItemsInBuffer(1, buffer._bufferSize() - 10);
+        _putItemsInBuffer(1, buffer.bufferSize() - 10);
 
         // fill the last 10 items plus 10 more
         // this should overwrite the first 10 items
-        _putItemsInBuffer(buffer._bufferSize() - 9, 20);
+        _putItemsInBuffer(buffer.bufferSize() - 9, 20);
 
         for (uint256 i = 0; i < 10; i++) {
-            uint256 eBlockNumber = buffer._bufferSize() + i + 1;
+            uint256 eBlockNumber = buffer.bufferSize() + i + 1;
 
             // should overwrite the first 10 items
             // should have set the block hash to the correct value
@@ -78,7 +78,7 @@ contract BufferTest is BaseTest {
         _putItemsInBuffer(1, 10);
 
         // cannot push zero length range
-        vm.startPrank(buffer._systemPusher());
+        vm.startPrank(buffer.systemPusher());
         vm.expectRevert(abi.encodeWithSelector(Buffer.InvalidBlockRange.selector, 10, 11, 0));
         buffer.receiveHashes(11, new bytes32[](0));
 
@@ -115,12 +115,17 @@ contract BufferTest is BaseTest {
         // fill the buffer with 10 items
         _putItemsInBuffer(1, 10, false);
 
+        assertFalse(buffer.systemHasPushed());
+
         // fill the buffer with 10 items using the system pusher
         _putItemsInBuffer(11, 10, true);
 
+        assertTrue(buffer.systemHasPushed());
+
+
         // make sure everything was put in properly
         for (uint256 i = 0; i < 20; i++) {
-            _shouldHaveAtIndexWithPusher(i + 1, i, i >= 10);
+            _shouldHaveAtIndex(i + 1, i);
         }
 
         // try to use the aliased pusher to push more items, should fail
@@ -141,7 +146,7 @@ contract BufferTest is BaseTest {
         for (uint256 i = 0; i < length; i++) {
             hashes[i] = keccak256(abi.encode(start + i));
         }
-        vm.prank(useSystem ? buffer._systemPusher() : AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
+        vm.prank(useSystem ? buffer.systemPusher() : AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
         buffer.receiveHashes(start, hashes);
     }
 
@@ -151,13 +156,7 @@ contract BufferTest is BaseTest {
 
     function _shouldHaveAtIndex(uint256 blockNumber, uint256 index) internal {
         _shouldHave(blockNumber);
-        assertEq(buffer._blockNumberBuffer(index).blockNumber, blockNumber);
-    }
-
-    function _shouldHaveAtIndexWithPusher(uint256 blockNumber, uint256 index, bool systemPusher) internal {
-        _shouldHave(blockNumber);
-        _shouldHaveAtIndex(blockNumber, index);
-        assertEq(buffer._blockNumberBuffer(index).pushedBySystem, systemPusher);
+        assertEq(buffer.blockNumberBuffer(index), blockNumber);
     }
 
     function _shouldNotHave(uint256 blockNumber) internal {
