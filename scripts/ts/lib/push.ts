@@ -21,7 +21,6 @@ export async function push(
   childSigner: DoubleWallet,
   pusherAddress: string,
   inbox: string,
-  numBlocks: number,
   options: {
     minElapsed?: number
     isCustomFee?: boolean
@@ -38,8 +37,7 @@ export async function push(
     const logs = await parentSigner.provider.getLogs({
       address: pusherAddress,
       topics: [
-        Pusher__factory.createInterface().getEvent('BlockHashesPushed')
-          .topicHash,
+        Pusher__factory.createInterface().getEvent('BlockHashPushed').topicHash,
       ],
       fromBlock: latestBlock - options.minElapsed,
     })
@@ -130,7 +128,6 @@ export async function push(
       return {
         data: pusherContract.interface.encodeFunctionData('pushHash', [
           inbox,
-          numBlocks,
           depositParams.maxFeePerGas.toBigInt(),
           depositParams.gasLimit.toBigInt(),
           depositParams.maxSubmissionCost.toBigInt(),
@@ -155,7 +152,6 @@ export async function push(
   // execute transaction
   const tx = await pusherContract.pushHash(
     inbox,
-    numBlocks,
     estimates.maxFeePerGas.toBigInt(),
     estimates.gasLimit.toBigInt(),
     estimates.maxSubmissionCost.toBigInt(),

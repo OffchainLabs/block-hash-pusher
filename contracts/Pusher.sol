@@ -10,9 +10,6 @@ import {IBuffer} from "./interfaces/IBuffer.sol";
 
 /// @notice The Pusher gets the hash of the previous 256 blocks and pushes them to the buffer on the child chain via retryable ticket.
 contract Pusher {
-    /// @notice The number of hashes to push per transaction.
-    uint256 public constant MAX_BATCH_SIZE = 256;
-
     /// @notice Whether this contract is deployed on an Arbitrum chain.
     ///         This condition changes the way the block number is retrieved.
     bool public immutable isArbitrum;
@@ -20,7 +17,7 @@ contract Pusher {
     address public immutable bufferAddress;
 
     /// @notice Emitted when block hashes are pushed to the buffer.
-    event BlockHashesPushed(uint256 firstBlockNumber);
+    event BlockHashPushed(uint256 blockNumber);
 
     /// @notice Thrown when incorrect msg.value is provided
     error IncorrectMsgValue(uint256 expected, uint256 provided);
@@ -38,20 +35,18 @@ contract Pusher {
     ///         or prefund the chain's inbox with the appropriate amount of fees.
     ///         (this is an [efficiency + implementation simplicity] vs [operator UX] tradeoff)
     /// @param inbox The address of the inbox on the child chain
-    /// @param batchSize The number of hashes to push. Must be less than or equal to MAX_BATCH_SIZE. Must be at least 1.
     /// @param gasPriceBid The gas price bid for the transaction.
     /// @param gasLimit The gas limit for the transaction.
     /// @param submissionCost The cost of submitting the transaction.
     /// @param isERC20Inbox Whether the inbox is an ERC20 inbox.
-    function pushHash(
-        address inbox,
-        uint256 batchSize, // todo: this should probably be removed and forced to 1. weird race conditions can come up with user choice
-        uint256 gasPriceBid,
-        uint256 gasLimit,
-        uint256 submissionCost,
-        bool isERC20Inbox
-    ) external payable {
-        (uint256 firstBlockNumber, bytes32[] memory blockHashes) = _buildBlockHashArray(batchSize);
+    function pushHash(address inbox, uint256 gasPriceBid, uint256 gasLimit, uint256 submissionCost, bool isERC20Inbox)
+        external
+        payable
+    {
+        // (uint256 firstBlockNumber, bytes32[] memory blockHashes) = _buildBlockHashArray();
+        uint256 blockNumber = isArbitrum ? ArbSys(address(100)).arbBlockNumber() - 1 : block.number - 1;
+        bytes32[] memory blockHashes = new bytes32[](1);
+        blockHashes[0] = isArbitrum ? ArbSys(address(100)).arbBlockHash(blockNumber) : blockhash(blockNumber);
 
         if (isERC20Inbox) {
             IERC20Inbox(inbox).createRetryableTicket({
@@ -62,7 +57,7 @@ contract Pusher {
                 callValueRefundAddress: msg.sender,
                 gasLimit: gasLimit,
                 maxFeePerGas: gasPriceBid,
-                data: abi.encodeCall(IBuffer.receiveHashes, (firstBlockNumber, blockHashes)),
+                data: abi.encodeCall(IBuffer.receiveHashes, (blockNumber, blockHashes)),
                 tokenTotalFeeAmount: gasLimit * gasPriceBid + submissionCost
             });
         } else {
@@ -77,35 +72,10 @@ contract Pusher {
                 callValueRefundAddress: msg.sender,
                 gasLimit: gasLimit,
                 maxFeePerGas: gasPriceBid,
-                data: abi.encodeCall(IBuffer.receiveHashes, (firstBlockNumber, blockHashes))
+                data: abi.encodeCall(IBuffer.receiveHashes, (blockNumber, blockHashes))
             });
         }
 
-        emit BlockHashesPushed(firstBlockNumber);
-    }
-
-    /// @dev Build an array of the last 256 block hashes
-    function _buildBlockHashArray(uint256 batchSize)
-        internal
-        view
-        returns (uint256 firstBlockNumber, bytes32[] memory blockHashes)
-    {
-        if (batchSize == 0 || batchSize > MAX_BATCH_SIZE) {
-            revert InvalidBatchSize(batchSize);
-        }
-
-        blockHashes = new bytes32[](batchSize);
-
-        if (isArbitrum) {
-            firstBlockNumber = ArbSys(address(100)).arbBlockNumber() - batchSize;
-            for (uint256 i = 0; i < batchSize; i++) {
-                blockHashes[i] = ArbSys(address(100)).arbBlockHash(firstBlockNumber + i);
-            }
-        } else {
-            firstBlockNumber = block.number - batchSize;
-            for (uint256 i = 0; i < batchSize; i++) {
-                blockHashes[i] = blockhash(firstBlockNumber + i);
-            }
-        }
+        emit BlockHashPushed(blockNumber);
     }
 }

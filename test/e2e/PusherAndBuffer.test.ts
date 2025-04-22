@@ -2,11 +2,6 @@ import { expect } from 'chai'
 import { Buffer__factory } from '../../typechain-types'
 import { OrbitTestSetup, testSetup } from './testSetup'
 import { ethers, Signer, Wallet } from 'ethers'
-import {
-  L1ToL2MessageStatus,
-  L1ToL2MessageWriter,
-} from '../../lib/arbitrum-sdk/src'
-import { L1ContractCallTransactionReceipt } from '../../lib/arbitrum-sdk/src/lib/message/L1Transaction'
 import { push } from '../../scripts/ts/lib/push'
 
 const CREATE2_FACTORY = '0x32ea7F2A6f7a2d442bADf82fEA569BA33aD97DD6'
@@ -127,14 +122,13 @@ describe('Pusher & Buffer', () => {
     })
 
     describe('Pushing to L2', () => {
-      it('should push 256 blocks to L2, and successfully auto redeem', async () => {
+      it('should push 1 block to L2, and successfully auto redeem', async () => {
         const logger = new FakeLogger()
         const receipt = (await push(
           setup.l1Signer,
           setup.l2Signer,
           pusherAddress,
           setup.l2Network.ethBridge.inbox,
-          256,
           {},
           logger.log.bind(logger)
         ))!
@@ -146,26 +140,22 @@ describe('Pusher & Buffer', () => {
 
         // check that we've pushed some block hashes
         const buffer = Buffer__factory.connect(bufferAddress, setup.l2Signer)
-        for (let i = 0; i < 256; i++) {
-          const parentBlockNumber = receipt.blockNumber - 256 + i
-          const blockHash = (await setup.l1Provider.getBlock(
-            parentBlockNumber
-          ))!.hash
-          const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
-          expect(pushedHash).to.eq(blockHash, `Block hash ${i} does not match`)
-        }
+        const parentBlockNumber = receipt.blockNumber - 1
+        const blockHash = (await setup.l1Provider.getBlock(parentBlockNumber))!
+          .hash
+        const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
+        expect(pushedHash).to.eq(blockHash, `Block hash does not match`)
       })
     })
 
     describe('Pushing to L3', () => {
-      it('should push 256 blocks to L3, and require manual redeem', async () => {
+      it('should push 1 block to L3, and require manual redeem', async () => {
         const logger = new FakeLogger()
         const receipt = (await push(
           setup.l2Signer,
           setup.l3Signer,
           pusherAddress,
           setup.l3Network.ethBridge.inbox,
-          256,
           {
             isCustomFee: true,
           },
@@ -178,14 +168,11 @@ describe('Pusher & Buffer', () => {
         }
 
         const buffer = Buffer__factory.connect(bufferAddress, setup.l3Signer)
-        for (let i = 0; i < 256; i++) {
-          const parentBlockNumber = receipt.blockNumber - 256 + i
-          const blockHash = (await setup.l2Provider.getBlock(
-            parentBlockNumber
-          ))!.hash
-          const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
-          expect(pushedHash).to.eq(blockHash, `Block hash ${i} does not match`)
-        }
+        const parentBlockNumber = receipt.blockNumber - 1
+        const blockHash = (await setup.l2Provider.getBlock(parentBlockNumber))!
+          .hash
+        const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
+        expect(pushedHash).to.eq(blockHash, `Block hash does not match`)
       })
     })
   })
