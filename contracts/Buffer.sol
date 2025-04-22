@@ -9,42 +9,30 @@ import {Pusher} from "./Pusher.sol";
 /// @dev    This contract is deployed with CREATE2 on all chains to the same address.
 ///         This contract's bytecode may or may not be overwritten in a future ArbOS upgrade.
 contract Buffer is IBuffer {
-    /// @dev The size of the ring buffer. This is the maximum number of block hashes that can be stored.
-    ///      Assuming a parent block time of 250ms and L1 block time of 12s,
-    ///      then the amount of time that the buffer covers is equivalent to EIP-2935's.
+    /// @inheritdoc IBuffer
     uint256 public constant bufferSize = 393168;
 
-    /// @dev A system address that is authorized to push hashes to the buffer.
+    /// @inheritdoc IBuffer
     address public constant systemPusher = address(0xA4B05); // todo: choose a good address for this
 
-    /// @dev The aliased address of the pusher contract on the parent chain.
+    /// @inheritdoc IBuffer
     address public immutable aliasedPusher;
 
     /// @dev A gap in the storage layout to allow for future storage variables.
     ///      It's unlikely this will be needed.
     uint256[50] __gap;
 
-    /// @notice Whether the system address has pushed a block hash to the buffer.
-    ///         Once this is set, only the system address can push more hashes.
+    /// @inheritdoc IBuffer
     bool public systemHasPushed;
 
-    /// @dev A pointer into the ring buffer. This is the index of the next block number to be pushed.
+    /// @inheritdoc IBuffer
     uint248 public bufferPtr;
 
-    /// @dev Maps block numbers to their hashes. This is a mapping of block number to block hash.
-    ///      Block hashes are deleted from the mapping when they are overwritten in the ring buffer.
+    /// @inheritdoc IBuffer
     mapping(uint256 => bytes32) public blockHashMapping;
 
-    /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
-    ///      Should be the last storage variable declared to maintain flexibility in resizing the buffer.
+    /// @inheritdoc IBuffer
     uint256[bufferSize] public blockNumberBuffer;
-
-    /// @notice Thrown by `parentBlockHash` when the block hash for a given block number is not found.
-    error UnknownParentBlockHash(uint256 parentBlockNumber);
-    /// @dev Thrown when the caller is not authorized to push hashes.
-    error NotPusher();
-    /// @dev Thrown when a given range cannot be pushed to the buffer.
-    error InvalidBlockRange(uint256 last, uint256 startOfRange, uint256 lengthOfRange);
 
     constructor() {
         aliasedPusher = AddressAliasHelper.applyL1ToL2Alias(address(new Pusher(address(this))));
@@ -107,7 +95,7 @@ contract Buffer is IBuffer {
             }
 
             // write the new block number into the buffer
-            blockNumberBuffer[currPtr] =blockToWrite;
+            blockNumberBuffer[currPtr] = blockToWrite;
 
             // write the new hash into the mapping
             blockHashMapping[blockToWrite] = blockHashes[blockToWrite - firstBlockNumber];

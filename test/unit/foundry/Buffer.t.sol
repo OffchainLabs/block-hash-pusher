@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import {Buffer} from "contracts/Buffer.sol";
+import {Buffer, IBuffer} from "contracts/Buffer.sol";
 import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
 import {BaseTest} from "test/unit/foundry/BaseTest.t.sol";
 
@@ -10,7 +10,7 @@ contract BufferTest is BaseTest {
     function testAccessControl() public {
         _deploy();
         address rando = address(0x123);
-        vm.expectRevert(Buffer.NotPusher.selector);
+        vm.expectRevert(IBuffer.NotPusher.selector);
         vm.prank(rando);
         buffer.receiveHashes(0, new bytes32[](0));
 
@@ -79,15 +79,15 @@ contract BufferTest is BaseTest {
 
         // cannot push zero length range
         vm.startPrank(buffer.systemPusher());
-        vm.expectRevert(abi.encodeWithSelector(Buffer.InvalidBlockRange.selector, 10, 11, 0));
+        vm.expectRevert(abi.encodeWithSelector(IBuffer.InvalidBlockRange.selector, 10, 11, 0));
         buffer.receiveHashes(11, new bytes32[](0));
 
         // cannot push a range whose end <= the last item in the buffer
         // test <
-        vm.expectRevert(abi.encodeWithSelector(Buffer.InvalidBlockRange.selector, 10, 5, 4));
+        vm.expectRevert(abi.encodeWithSelector(IBuffer.InvalidBlockRange.selector, 10, 5, 4));
         buffer.receiveHashes(5, new bytes32[](4));
         // test ==
-        vm.expectRevert(abi.encodeWithSelector(Buffer.InvalidBlockRange.selector, 10, 5, 6));
+        vm.expectRevert(abi.encodeWithSelector(IBuffer.InvalidBlockRange.selector, 10, 5, 6));
         buffer.receiveHashes(5, new bytes32[](6));
         vm.stopPrank();
 
@@ -122,14 +122,13 @@ contract BufferTest is BaseTest {
 
         assertTrue(buffer.systemHasPushed());
 
-
         // make sure everything was put in properly
         for (uint256 i = 0; i < 20; i++) {
             _shouldHaveAtIndex(i + 1, i);
         }
 
         // try to use the aliased pusher to push more items, should fail
-        vm.expectRevert(Buffer.NotPusher.selector);
+        vm.expectRevert(IBuffer.NotPusher.selector);
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
         buffer.receiveHashes(21, new bytes32[](10));
 
@@ -160,7 +159,7 @@ contract BufferTest is BaseTest {
     }
 
     function _shouldNotHave(uint256 blockNumber) internal {
-        vm.expectRevert(abi.encodeWithSelector(Buffer.UnknownParentBlockHash.selector, blockNumber));
+        vm.expectRevert(abi.encodeWithSelector(IBuffer.UnknownParentBlockHash.selector, blockNumber));
         buffer.parentBlockHash(blockNumber);
     }
 }
