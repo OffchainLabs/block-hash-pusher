@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 /// @notice This contract is a ring buffer that stores parent chain block hashes.
-/// @dev    Other functions of a given implementation not included in this interface are not guaranteed to be stable.
+/// @dev    All functions in this interface besides parentBlockHash(uint256) are not guaranteed to be stable.
 ///         The ring buffer is sparse, meaning the block numbers are not guaranteed to be contiguous.
 ///         A future version may or may not change the implementation of the ring buffer to be dense.
 ///         The size of the ring buffer may increase or decrease in future versions.
@@ -20,7 +20,7 @@ interface IBuffer {
     /// @param blockHashes The hashes of the blocks to be pushed. These are assumed to be in contiguous order.
     function receiveHashes(uint256 firstBlockNumber, bytes32[] memory blockHashes) external;
 
-    /// @notice Get a parent block hash given parent block number.
+    /// @notice Get a parent block hash given parent block number. Guaranteed to be stable.
     /// @param parentBlockNumber The block number of the parent block.
     /// @return The block hash of the parent block.
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32);

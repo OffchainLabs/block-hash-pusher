@@ -7,38 +7,21 @@ import {ArbitrumChecker} from "@arbitrum/nitro-contracts/src/libraries/ArbitrumC
 import {IInbox} from "@arbitrum/nitro-contracts/src/bridge/IInbox.sol";
 import {IERC20Inbox} from "@arbitrum/nitro-contracts/src/bridge/IERC20Inbox.sol";
 import {IBuffer} from "./interfaces/IBuffer.sol";
+import {IPusher} from "./interfaces/IPusher.sol";
 
 /// @notice The Pusher gets the hash of the previous 256 blocks and pushes them to the buffer on the child chain via retryable ticket.
-contract Pusher {
-    /// @notice Whether this contract is deployed on an Arbitrum chain.
-    ///         This condition changes the way the block number is retrieved.
+contract Pusher is IPusher {
+    /// @inheritdoc IPusher
     bool public immutable isArbitrum;
-    /// @notice The address of the buffer contract on the child chain.
+    /// @inheritdoc IPusher
     address public immutable bufferAddress;
-
-    /// @notice Emitted when block hashes are pushed to the buffer.
-    event BlockHashPushed(uint256 blockNumber);
-
-    /// @notice Thrown when incorrect msg.value is provided
-    error IncorrectMsgValue(uint256 expected, uint256 provided);
-
-    /// @notice Thrown when the batch size is invalid.
-    error InvalidBatchSize(uint256 batchSize);
 
     constructor(address _bufferAddress) {
         bufferAddress = _bufferAddress;
         isArbitrum = ArbitrumChecker.runningOnArbitrum();
     }
 
-    /// @notice Push the hash of the previous block to the buffer on the child chain specified by inbox
-    ///         For custom fee chains, the caller must either set gasPriceBid, gasLimit, and submissionCost to 0 and manually redeem on the child,
-    ///         or prefund the chain's inbox with the appropriate amount of fees.
-    ///         (this is an [efficiency + implementation simplicity] vs [operator UX] tradeoff)
-    /// @param inbox The address of the inbox on the child chain
-    /// @param gasPriceBid The gas price bid for the transaction.
-    /// @param gasLimit The gas limit for the transaction.
-    /// @param submissionCost The cost of submitting the transaction.
-    /// @param isERC20Inbox Whether the inbox is an ERC20 inbox.
+    /// @inheritdoc IPusher
     function pushHash(address inbox, uint256 gasPriceBid, uint256 gasLimit, uint256 submissionCost, bool isERC20Inbox)
         external
         payable
