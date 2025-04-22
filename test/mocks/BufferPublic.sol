@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import {Buffer} from "contracts/Pusher.sol";
+import {Buffer} from "contracts/Buffer.sol";
 
 /// @notice Extend Buffer to expose otherwise internal functions and state variables.
 contract BufferPublic is Buffer {

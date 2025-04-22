@@ -6,7 +6,7 @@ import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/Addres
 import {ArbitrumChecker} from "@arbitrum/nitro-contracts/src/libraries/ArbitrumChecker.sol";
 import {IInbox} from "@arbitrum/nitro-contracts/src/bridge/IInbox.sol";
 import {IERC20Inbox} from "@arbitrum/nitro-contracts/src/bridge/IERC20Inbox.sol";
-import {Buffer} from "./Buffer.sol";
+import {IBuffer} from "./interfaces/IBuffer.sol";
 
 /// @notice The Pusher gets the hash of the previous 256 blocks and pushes them to the buffer on the child chain via retryable ticket.
 contract Pusher {
@@ -62,7 +62,7 @@ contract Pusher {
                 callValueRefundAddress: msg.sender,
                 gasLimit: gasLimit,
                 maxFeePerGas: gasPriceBid,
-                data: abi.encodeCall(Buffer.receiveHashes, (firstBlockNumber, blockHashes)),
+                data: abi.encodeCall(IBuffer.receiveHashes, (firstBlockNumber, blockHashes)),
                 tokenTotalFeeAmount: gasLimit * gasPriceBid + submissionCost
             });
         } else {
@@ -77,7 +77,7 @@ contract Pusher {
                 callValueRefundAddress: msg.sender,
                 gasLimit: gasLimit,
                 maxFeePerGas: gasPriceBid,
-                data: abi.encodeCall(Buffer.receiveHashes, (firstBlockNumber, blockHashes))
+                data: abi.encodeCall(IBuffer.receiveHashes, (firstBlockNumber, blockHashes))
             });
         }
 
