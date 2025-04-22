@@ -149,6 +149,10 @@ describe('Pusher & Buffer', () => {
     })
 
     describe('Pushing to L3', () => {
+      it('should push 1 block to L3, and auto redeem', async () => {
+        throw new Error('Not implemented yet')
+      })
+
       it('should push 1 block to L3, and require manual redeem', async () => {
         const logger = new FakeLogger()
         const receipt = (await push(

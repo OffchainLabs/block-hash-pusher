@@ -37,7 +37,8 @@ export async function push(
     const logs = await parentSigner.provider.getLogs({
       address: pusherAddress,
       topics: [
-        IPusher__factory.createInterface().getEvent('BlockHashPushed').topicHash,
+        IPusher__factory.createInterface().getEvent('BlockHashPushed')
+          .topicHash,
       ],
       fromBlock: latestBlock - options.minElapsed,
     })

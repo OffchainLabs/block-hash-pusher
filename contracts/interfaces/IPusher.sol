@@ -12,9 +12,6 @@ interface IPusher {
     error InvalidBatchSize(uint256 batchSize);
 
     /// @notice Push the hash of the previous block to the buffer on the child chain specified by inbox
-    ///         For custom fee chains, the caller must either set gasPriceBid, gasLimit, and submissionCost to 0 and manually redeem on the child,
-    ///         or prefund the chain's inbox with the appropriate amount of fees.
-    ///         (this is an [efficiency + implementation simplicity] vs [operator UX] tradeoff)
     /// @param inbox The address of the inbox on the child chain
     /// @param gasPriceBid The gas price bid for the transaction.
     /// @param gasLimit The gas limit for the transaction.
