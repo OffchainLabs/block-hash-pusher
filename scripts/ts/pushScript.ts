@@ -7,7 +7,6 @@ import { parseIntThrowing } from './util'
 
 program
   .argument('<inbox>', 'The inbox address to push through')
-  .argument('<num-blocks>', 'The number of blocks to push')
   .option(
     '--min-elapsed <blocks>',
     'The minimum number of elapsed blocks since the last push. ' +
@@ -23,7 +22,7 @@ program
     '--manual-redeem',
     'Disable payment for auto redeem on parent chain. Always set for custom fee child chains'
   )
-  .action(async (inbox, numBlocks, options) => {
+  .action(async (inbox, options) => {
     push(
       new DoubleWallet(
         getEnv('PARENT_PRIVATE_KEY'),
@@ -35,7 +34,6 @@ program
       ),
       getEnv('PUSHER_ADDRESS'),
       inbox,
-      parseIntThrowing(numBlocks),
       {
         ...options,
         minElapsed: options.minElapsed
