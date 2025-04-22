@@ -43,7 +43,6 @@ contract Pusher {
         external
         payable
     {
-        // (uint256 firstBlockNumber, bytes32[] memory blockHashes) = _buildBlockHashArray();
         uint256 blockNumber = isArbitrum ? ArbSys(address(100)).arbBlockNumber() - 1 : block.number - 1;
         bytes32[] memory blockHashes = new bytes32[](1);
         blockHashes[0] = isArbitrum ? ArbSys(address(100)).arbBlockHash(blockNumber) : blockhash(blockNumber);
