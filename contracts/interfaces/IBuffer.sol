@@ -11,14 +11,14 @@ interface IBuffer {
     error UnknownParentBlockHash(uint256 parentBlockNumber);
     /// @dev Thrown when the caller is not authorized to push hashes.
     error NotPusher();
-    /// @dev Thrown when a given range cannot be pushed to the buffer.
-    error InvalidBlockRange(uint256 last, uint256 startOfRange, uint256 lengthOfRange);
 
     /// @dev Pushes some block hashes to the ring buffer. Can only be called by the aliased pusher contract or chain owners.
     ///      The last block in the buffer must be less than the last block being pushed.
     /// @param firstBlockNumber The block number of the first block in the batch.
     /// @param blockHashes The hashes of the blocks to be pushed. These are assumed to be in contiguous order.
-    function receiveHashes(uint256 firstBlockNumber, bytes32[] memory blockHashes) external;
+    /// @return success Whether the push was successful. If the given block range is eclipsed by what's already in the buffer,
+    ///         the function will early return false. Otherwise, it will return true.
+    function receiveHashes(uint256 firstBlockNumber, bytes32[] memory blockHashes) external returns (bool success);
 
     /// @notice Get a parent block hash given parent block number. Guaranteed to be stable.
     /// @param parentBlockNumber The block number of the parent block.

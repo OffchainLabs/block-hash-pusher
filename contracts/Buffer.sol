@@ -51,7 +51,22 @@ contract Buffer is IBuffer {
     }
 
     /// @inheritdoc IBuffer
-    function receiveHashes(uint256 firstBlockNumber, bytes32[] calldata blockHashes) external {
+    function receiveHashes(uint256 firstBlockNumber, bytes32[] calldata blockHashes) external returns (bool success) {
+        uint256 startPtr = bufferPtr;
+        uint256 prevPtr = (startPtr + bufferSize - 1) % bufferSize;
+        uint256 prevBlockNumber = blockNumberBuffer[prevPtr];
+
+        // if the previous value in the ring buffer is >= firstBlockNumber, adjust the range we are writing to start from prev + 1
+        // determine the range of block numbers we are writing [writeStart, writeEnd)
+        uint256 writeStart = prevBlockNumber >= firstBlockNumber ? prevBlockNumber + 1 : firstBlockNumber;
+        uint256 writeEnd = firstBlockNumber + blockHashes.length;
+
+        // ensure the range is valid, if not, skip
+        if (writeEnd <= writeStart) {
+            return false;
+        }
+
+        // check caller authorization
         if (systemHasPushed) {
             // if the system has pushed, only the system can push
             if (msg.sender != systemPusher) {
@@ -65,26 +80,7 @@ contract Buffer is IBuffer {
             revert NotPusher();
         }
 
-        uint256 startPtr = bufferPtr;
-        uint256 prevPtr = (startPtr + bufferSize - 1) % bufferSize;
-        uint256 prevBlockNumber = blockNumberBuffer[prevPtr];
-
-        // if the previous value in the ring buffer is >= firstBlockNumber, adjust the range we are writing to start from prev + 1
-        // determine the range of block numbers we are writing [writeStart, writeEnd)
-        uint256 writeStart = prevBlockNumber >= firstBlockNumber ? prevBlockNumber + 1 : firstBlockNumber;
-        uint256 writeEnd = firstBlockNumber + blockHashes.length;
-
-        // ensure the range is valid
-        if (writeEnd <= writeStart) {
-            revert InvalidBlockRange(prevBlockNumber, firstBlockNumber, blockHashes.length);
-        }
-
         // write to the buffer in a loop
-        // todo: there's a potential optimization where we don't write to the buffer every block and instead write a range.
-        // i think it is probably not worth the complexity, at least in arb1's case.
-        // rationale being that we'll get a new batch of hashes after every sequencer batch, which happens every few minutes.
-        // on orbit chains with lower batch posting frequency, this optimization may be worth it if ArbOS is backfilling.
-        // on the other hand though, the pushing transaction will not actually consume gas
         for (uint256 blockToWrite = writeStart; blockToWrite < writeEnd; blockToWrite++) {
             uint256 currPtr = (startPtr + blockToWrite - writeStart) % bufferSize;
 
@@ -103,5 +99,7 @@ contract Buffer is IBuffer {
 
         // increment the pointer
         bufferPtr = uint248((startPtr + writeEnd - writeStart) % bufferSize);
+
+        return true;
     }
 }
