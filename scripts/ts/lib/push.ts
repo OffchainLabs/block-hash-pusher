@@ -1,6 +1,10 @@
 import { BigNumber } from 'ethers-v5'
 import { L1ToL2MessageGasParams } from '../../../lib/arbitrum-sdk/src/lib/message/L1ToL2MessageCreator'
-import { IPusher__factory } from '../../../typechain-types'
+import {
+  IERC20__factory,
+  IERC20Bridge__factory,
+  IPusher__factory,
+} from '../../../typechain-types'
 import { DoubleWallet } from '../../template/util'
 import { getSdkEthBridge } from '../util'
 import {
@@ -15,6 +19,7 @@ import {
 } from '../../../lib/arbitrum-sdk/src'
 import { L1ContractCallTransactionReceipt } from '../../../lib/arbitrum-sdk/src/lib/message/L1Transaction'
 import { L1ToL2MessageWriter } from '../../../lib/arbitrum-sdk/src/lib/message/L1ToL2Message'
+import { ethers } from 'ethers'
 
 export async function push(
   parentSigner: DoubleWallet,
@@ -50,11 +55,6 @@ export async function push(
     }
   }
 
-  if (options.isCustomFee) {
-    log('Pushing with custom fee child chain, forcing manual redeem')
-    options.manualRedeem = true
-  }
-
   const childChainId = parseInt(
     (await childSigner.provider.getNetwork()).chainId.toString()
   )
@@ -63,6 +63,13 @@ export async function push(
   )
 
   // add custom network through sdk if required
+  const ethBridge = await getSdkEthBridge(inbox, parentSigner.doubleProvider)
+  const nativeToken = options.isCustomFee
+    ? await IERC20Bridge__factory.connect(
+        ethBridge.bridge,
+        parentSigner
+      ).nativeToken()
+    : undefined
   if (!l2Networks[childChainId]) {
     console.log('adding custom l2 network')
     addCustomNetwork({
@@ -95,7 +102,7 @@ export async function push(
           l1MultiCall: '',
           l2Multicall: '',
         },
-        ethBridge: await getSdkEthBridge(inbox, parentSigner.doubleProvider),
+        ethBridge,
         partnerChainID: parentChainId,
         isArbitrum: true,
         confirmPeriodBlocks: 0,
@@ -109,20 +116,43 @@ export async function push(
         isCustom: true,
         blockTime: 0,
         partnerChainIDs: [],
+        nativeToken,
       },
     })
   }
 
   // default gas estimates
-  let estimates: L1ToL2MessageGasParams = {
-    maxSubmissionCost: BigNumber.from(0),
-    maxFeePerGas: BigNumber.from(0),
-    gasLimit: BigNumber.from(0),
-    deposit: BigNumber.from(0),
-  }
-  if (!options.manualRedeem) {
+  let estimates: L1ToL2MessageGasParams
+
+  // if custom fee and manual redeem, use zeros
+  // if custom fee and auto redeem, estimate all
+  // if eth and manual, estimate submission
+  // if eth and auto, estimate all
+  const gasEstimator = new L1ToL2MessageGasEstimator(childSigner.v5.provider)
+  if (options.isCustomFee && options.manualRedeem) {
+    estimates = {
+      maxSubmissionCost: BigNumber.from(0),
+      maxFeePerGas: BigNumber.from(0),
+      gasLimit: BigNumber.from(0),
+      deposit: BigNumber.from(0),
+    }
+  } else {
+    if (options.isCustomFee) {
+      // we need to approve the pusher contract prior to estimation
+      const token = IERC20__factory.connect(nativeToken!, parentSigner)
+      const currAllowance = await token.allowance(
+        parentSigner.address,
+        pusherAddress
+      )
+      if (currAllowance !== ethers.MaxUint256) {
+        const approveTx = await token.approve(pusherAddress, ethers.MaxUint256)
+        log(`Approving Pusher contract ${approveTx.hash}`)
+        await approveTx.wait()
+        log(`Pusher contract approved`)
+      }
+    }
+
     // estimate gas
-    // we can assume non custom fee child chain because we checked for it above
     const estimationFunc = (
       depositParams: OmitTyped<L1ToL2MessageGasParams, 'deposit'>
     ) => {
@@ -132,22 +162,31 @@ export async function push(
           depositParams.maxFeePerGas.toBigInt(),
           depositParams.gasLimit.toBigInt(),
           depositParams.maxSubmissionCost.toBigInt(),
-          false,
+          options.isCustomFee || false,
         ]),
         to: pusherAddress,
         from: parentSigner.address,
-        value: depositParams.gasLimit
-          .mul(depositParams.maxFeePerGas)
-          .add(depositParams.maxSubmissionCost),
+        value: options.isCustomFee
+          ? 0
+          : depositParams.gasLimit
+              .mul(depositParams.maxFeePerGas)
+              .add(depositParams.maxSubmissionCost),
       }
     }
-    const gasEstimator = new L1ToL2MessageGasEstimator(childSigner.v5.provider)
+
     estimates = (
       await gasEstimator.populateFunctionParams(
         estimationFunc,
         parentSigner.doubleProvider.v5
       )
     ).estimates
+
+    // if we are manually redeeming, we only provide the max submission cost
+    if (options.manualRedeem) {
+      estimates.gasLimit = BigNumber.from(0)
+      estimates.maxFeePerGas = BigNumber.from(0)
+      estimates.deposit = estimates.maxSubmissionCost
+    }
   }
 
   // execute transaction
