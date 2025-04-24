@@ -8,9 +8,6 @@ interface IPusher {
 
     error IncorrectMsgValue(uint256 expected, uint256 provided);
 
-    /// @notice Thrown when the batch size is invalid.
-    error InvalidBatchSize(uint256 batchSize);
-
     /// @notice Push the hash of the previous block to the buffer on the child chain specified by inbox
     /// @param inbox The address of the inbox on the child chain
     /// @param gasPriceBid The gas price bid for the transaction.
