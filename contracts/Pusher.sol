@@ -12,7 +12,7 @@ import {IERC20Bridge} from "@arbitrum/nitro-contracts/src/bridge/IERC20Bridge.so
 import {IBuffer} from "./interfaces/IBuffer.sol";
 import {IPusher} from "./interfaces/IPusher.sol";
 
-/// @notice The Pusher gets the hash of the previous 256 blocks and pushes them to the buffer on the child chain via retryable ticket.
+/// @notice The Pusher gets the hash of the previous block and pushes it to the buffer on the child chain via retryable ticket.
 contract Pusher is IPusher {
     using SafeERC20 for IERC20;
 
