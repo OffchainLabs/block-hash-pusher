@@ -15,10 +15,10 @@ contract BufferTest is BaseTest {
         buffer.receiveHashes(1, new bytes32[](1));
 
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
-        assertTrue(buffer.receiveHashes(1, new bytes32[](1)));
+        buffer.receiveHashes(1, new bytes32[](1));
 
         vm.prank(buffer.systemPusher());
-        assertTrue(buffer.receiveHashes(2, new bytes32[](1)));
+        buffer.receiveHashes(2, new bytes32[](1));
     }
 
     function testCanPushFirstItem() public {
@@ -79,13 +79,16 @@ contract BufferTest is BaseTest {
 
         // cannot push zero length range
         vm.startPrank(buffer.systemPusher());
-        assertFalse(buffer.receiveHashes(11, new bytes32[](0)));
+        vm.expectRevert(); // todo
+        buffer.receiveHashes(11, new bytes32[](0));
 
         // cannot push a range whose end <= the last item in the buffer
         // test <
-        assertFalse(buffer.receiveHashes(5, new bytes32[](4)));
+        vm.expectRevert(); // todo
+        buffer.receiveHashes(5, new bytes32[](4));
         // test ==
-        assertFalse(buffer.receiveHashes(5, new bytes32[](6)));
+        vm.expectRevert(); // todo
+        buffer.receiveHashes(5, new bytes32[](6));
         vm.stopPrank();
 
         // can push a range whose end > the last item in the buffer and start <= the last item in the buffer
@@ -143,7 +146,7 @@ contract BufferTest is BaseTest {
             hashes[i] = keccak256(abi.encode(start + i));
         }
         vm.prank(useSystem ? buffer.systemPusher() : AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
-        assertTrue(buffer.receiveHashes(start, hashes));
+        buffer.receiveHashes(start, hashes);
     }
 
     function _shouldHave(uint256 blockNumber) internal {
@@ -152,7 +155,7 @@ contract BufferTest is BaseTest {
 
     function _shouldHaveAtIndex(uint256 blockNumber, uint256 index) internal {
         _shouldHave(blockNumber);
-        assertEq(buffer.blockNumberBuffer(index), blockNumber);
+        // assertEq(buffer.blockNumberBuffer(index), blockNumber);
     }
 
     function _shouldNotHave(uint256 blockNumber) internal {

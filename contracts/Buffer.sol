@@ -18,21 +18,13 @@ contract Buffer is IBuffer {
     /// @inheritdoc IBuffer
     address public immutable aliasedPusher;
 
-    /// @dev A gap in the storage layout to allow for future storage variables.
-    ///      It's unlikely this will be needed.
-    uint256[50] __gap;
-
     /// @inheritdoc IBuffer
     bool public systemHasPushed;
 
-    /// @inheritdoc IBuffer
-    uint248 public bufferPtr;
+    uint248 firstBlockInBuffer = 0;
 
     /// @inheritdoc IBuffer
     mapping(uint256 => bytes32) public blockHashMapping;
-
-    /// @inheritdoc IBuffer
-    uint256[bufferSize] public blockNumberBuffer;
 
     constructor() {
         aliasedPusher = AddressAliasHelper.applyL1ToL2Alias(address(new Pusher(address(this))));
@@ -51,19 +43,15 @@ contract Buffer is IBuffer {
     }
 
     /// @inheritdoc IBuffer
-    function receiveHashes(uint256 firstBlockNumber, bytes32[] calldata blockHashes) external returns (bool success) {
-        uint256 startPtr = bufferPtr;
-        uint256 prevPtr = (startPtr + bufferSize - 1) % bufferSize;
-        uint256 prevBlockNumber = blockNumberBuffer[prevPtr];
-
-        // if the previous value in the ring buffer is >= firstBlockNumber, adjust the range we are writing to start from prev + 1
-        // determine the range of block numbers we are writing [writeStart, writeEnd)
-        uint256 writeStart = prevBlockNumber >= firstBlockNumber ? prevBlockNumber + 1 : firstBlockNumber;
-        uint256 writeEnd = firstBlockNumber + blockHashes.length;
-
-        // ensure the range is valid, if not, skip
-        if (writeEnd <= writeStart) {
-            return false;
+    function receiveHashes(uint256 firstBlockNumber, bytes32[] calldata blockHashes) external {
+        if (blockHashes.length == 0) {
+            revert("no hashes");
+        }
+        if (blockHashes.length > bufferSize) {
+            revert("too many hashes");
+        }
+        if (firstBlockNumber + blockHashes.length < firstBlockInBuffer) {
+            revert("block too late");
         }
 
         // check caller authorization
@@ -80,26 +68,24 @@ contract Buffer is IBuffer {
             revert NotPusher();
         }
 
-        // write to the buffer in a loop
-        for (uint256 blockToWrite = writeStart; blockToWrite < writeEnd; blockToWrite++) {
-            uint256 currPtr = (startPtr + blockToWrite - writeStart) % bufferSize;
+        uint256 _firstBlockInBuffer = firstBlockInBuffer;
 
-            // if we are overwriting a block number, delete its hash from the mapping
-            uint256 valueAtPtr = blockNumberBuffer[currPtr];
-            if (valueAtPtr != 0) {
-                blockHashMapping[valueAtPtr] = 0;
-            }
-
-            // write the new block number into the buffer
-            blockNumberBuffer[currPtr] = blockToWrite;
-
-            // write the new hash into the mapping
-            blockHashMapping[blockToWrite] = blockHashes[blockToWrite - firstBlockNumber];
+        if (firstBlockNumber < _firstBlockInBuffer) {
+            revert("block too early");
         }
 
-        // increment the pointer
-        bufferPtr = uint248((startPtr + writeEnd - writeStart) % bufferSize);
+        // see if we must evict from mapping and update firstBlockInBuffer
+        if (firstBlockNumber + blockHashes.length > _firstBlockInBuffer + bufferSize) {
+            uint256 countToEvict = firstBlockNumber + blockHashes.length - (_firstBlockInBuffer + bufferSize);
+            for (uint256 i = 0; i < countToEvict; i++) {
+                blockHashMapping[_firstBlockInBuffer + i] = 0;
+            }
+            firstBlockInBuffer = uint248(_firstBlockInBuffer + bufferSize);
+        }
 
-        return true;
+        // fill the buffer with the new hashes
+        for (uint256 i = 0; i < blockHashes.length; i++) {
+            blockHashMapping[firstBlockNumber + i] = blockHashes[i];
+        }
     }
 }

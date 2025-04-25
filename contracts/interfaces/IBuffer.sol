@@ -16,9 +16,7 @@ interface IBuffer {
     ///      The last block in the buffer must be less than the last block being pushed.
     /// @param firstBlockNumber The block number of the first block in the batch.
     /// @param blockHashes The hashes of the blocks to be pushed. These are assumed to be in contiguous order.
-    /// @return success Whether the push was successful. If the given block range is eclipsed by what's already in the buffer,
-    ///         the function will early return false. Otherwise, it will return true.
-    function receiveHashes(uint256 firstBlockNumber, bytes32[] memory blockHashes) external returns (bool success);
+    function receiveHashes(uint256 firstBlockNumber, bytes32[] memory blockHashes) external;
 
     /// @notice Get a parent block hash given parent block number. Guaranteed to be stable.
     /// @param parentBlockNumber The block number of the parent block.
@@ -36,11 +34,6 @@ interface IBuffer {
     /// @dev Maps block numbers to their hashes. This is a mapping of block number to block hash.
     ///      Block hashes are deleted from the mapping when they are overwritten in the ring buffer.
     function blockHashMapping(uint256) external view returns (bytes32);
-    /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
-    ///      Should be the last storage variable declared to maintain flexibility in resizing the buffer.
-    function blockNumberBuffer(uint256) external view returns (uint256);
-    /// @dev A pointer into the ring buffer. This is the index of the next block number to be pushed.
-    function bufferPtr() external view returns (uint248);
     /// @dev Whether the system address has pushed a block hash to the buffer.
     ///         Once this is set, only the system address can push more hashes.
     function systemHasPushed() external view returns (bool);
