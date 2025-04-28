@@ -75,7 +75,7 @@ contract Buffer is IBuffer {
             }
             if (existingBlockNumber != 0) {
                 // evict the old block hash
-                delete blockHashMapping[existingBlockNumber];
+                blockHashMapping[existingBlockNumber] = 0;
             }
             // store the new block hash
             blockHashMapping[blockNumber] = blockHashes[i];
