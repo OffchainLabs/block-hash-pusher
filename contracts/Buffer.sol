@@ -21,10 +21,15 @@ contract Buffer is IBuffer {
     /// @inheritdoc IBuffer
     bool public systemHasPushed;
 
-    uint248 firstBlockInBuffer = 0;
-
     /// @inheritdoc IBuffer
     mapping(uint256 => bytes32) public blockHashMapping;
+
+    /// @dev Reserved for future use
+    uint256[50] __gap;
+
+    /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
+    ///      Should be the last storage variable declared to maintain flexibility in resizing the buffer.
+    uint256[bufferSize] public blockNumberBuffer;
 
     constructor() {
         aliasedPusher = AddressAliasHelper.applyL1ToL2Alias(address(new Pusher(address(this))));
@@ -44,17 +49,7 @@ contract Buffer is IBuffer {
 
     /// @inheritdoc IBuffer
     function receiveHashes(uint256 firstBlockNumber, bytes32[] calldata blockHashes) external {
-        if (blockHashes.length == 0) {
-            revert("no hashes");
-        }
-        if (blockHashes.length > bufferSize) {
-            revert("too many hashes");
-        }
-        if (firstBlockNumber + blockHashes.length < firstBlockInBuffer) {
-            revert("block too late");
-        }
-
-        // check caller authorization
+        // access control
         if (systemHasPushed) {
             // if the system has pushed, only the system can push
             if (msg.sender != systemPusher) {
@@ -68,24 +63,22 @@ contract Buffer is IBuffer {
             revert NotPusher();
         }
 
-        uint256 _firstBlockInBuffer = firstBlockInBuffer;
-
-        if (firstBlockNumber < _firstBlockInBuffer) {
-            revert("block too early");
-        }
-
-        // see if we must evict from mapping and update firstBlockInBuffer
-        if (firstBlockNumber + blockHashes.length > _firstBlockInBuffer + bufferSize) {
-            uint256 countToEvict = firstBlockNumber + blockHashes.length - (_firstBlockInBuffer + bufferSize);
-            for (uint256 i = 0; i < countToEvict; i++) {
-                blockHashMapping[_firstBlockInBuffer + i] = 0;
-            }
-            firstBlockInBuffer = uint248(_firstBlockInBuffer + bufferSize);
-        }
-
-        // fill the buffer with the new hashes
+        // write the hashes to the buffer, evicting old hashes as necessary
         for (uint256 i = 0; i < blockHashes.length; i++) {
-            blockHashMapping[firstBlockNumber + i] = blockHashes[i];
+            uint256 blockNumber = firstBlockNumber + i;
+            uint256 bufferIndex = blockNumber % bufferSize;
+            uint256 existingBlockNumber = blockNumberBuffer[bufferIndex];
+            if (blockNumber <= existingBlockNumber) {
+                // noop
+                continue;
+            }
+            if (existingBlockNumber != 0) {
+                // evict the old block hash
+                delete blockHashMapping[existingBlockNumber];
+            }
+            // store the new block hash
+            blockHashMapping[blockNumber] = blockHashes[i];
+            blockNumberBuffer[bufferIndex] = blockNumber;
         }
     }
 }
