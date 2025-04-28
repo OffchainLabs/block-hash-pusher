@@ -18,14 +18,15 @@ contract Buffer is IBuffer {
     /// @inheritdoc IBuffer
     address public immutable aliasedPusher;
 
+    /// @dev A gap in the storage layout to allow for future storage variables.
+    ///      It's unlikely this will be needed.
+    uint256[50] __gap;
+
     /// @inheritdoc IBuffer
     bool public systemHasPushed;
 
     /// @inheritdoc IBuffer
     mapping(uint256 => bytes32) public blockHashMapping;
-
-    /// @dev Reserved for future use
-    uint256[50] __gap;
 
     /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
     ///      Should be the last storage variable declared to maintain flexibility in resizing the buffer.
