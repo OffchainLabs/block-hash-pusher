@@ -28,8 +28,7 @@ contract Buffer is IBuffer {
     /// @inheritdoc IBuffer
     mapping(uint256 => bytes32) public blockHashMapping;
 
-    /// @dev A ring buffer of block numbers whose hashes are stored in the `blockHashes` mapping.
-    ///      Should be the last storage variable declared to maintain flexibility in resizing the buffer.
+    /// @inheritdoc IBuffer
     uint256[bufferSize] public blockNumberBuffer;
 
     constructor() {
