@@ -25,7 +25,7 @@ contract BufferTest is BaseTest {
         _deploy();
         _putItemsInBuffer(1, 1);
 
-        _shouldHaveAtIndex(1, 0);
+        _shouldHave(1);
     }
 
     function testCanPushFirstItems() public {
@@ -36,7 +36,7 @@ contract BufferTest is BaseTest {
         _putItemsInBuffer(first, len);
 
         for (uint256 i = 0; i < len; i++) {
-            _shouldHaveAtIndex(first + i, i);
+            _shouldHave(first + i);
         }
     }
 
@@ -55,7 +55,7 @@ contract BufferTest is BaseTest {
 
             // should overwrite the first 10 items
             // should have set the block hash to the correct value
-            _shouldHaveAtIndex(eBlockNumber, i);
+            _shouldHave(eBlockNumber);
 
             // should have evicted the old block hashes
             _shouldNotHave(i + 1);
@@ -69,44 +69,6 @@ contract BufferTest is BaseTest {
 
         _shouldHave(1);
         _shouldNotHave(2);
-    }
-
-    function testRangeValidityChecking() public {
-        _deploy();
-
-        // put some stuff in the buffer
-        _putItemsInBuffer(1, 10);
-
-        // cannot push zero length range
-        vm.startPrank(buffer.systemPusher());
-        vm.expectRevert(); // todo
-        buffer.receiveHashes(11, new bytes32[](0));
-
-        // cannot push a range whose end <= the last item in the buffer
-        // test <
-        vm.expectRevert(); // todo
-        buffer.receiveHashes(5, new bytes32[](4));
-        // test ==
-        vm.expectRevert(); // todo
-        buffer.receiveHashes(5, new bytes32[](6));
-        vm.stopPrank();
-
-        // can push a range whose end > the last item in the buffer and start <= the last item in the buffer
-        // test <
-        _putItemsInBuffer(5, 7);
-        // test ==
-        _putItemsInBuffer(11, 2);
-
-        for (uint256 i = 0; i < 12; i++) {
-            _shouldHaveAtIndex(i + 1, i);
-        }
-
-        // we can skip ahead and push a range that starts > the last item in the buffer
-        _putItemsInBuffer(20, 2);
-        _shouldHaveAtIndex(20, 12);
-        _shouldHaveAtIndex(21, 13);
-        _shouldNotHave(22);
-        _shouldNotHave(19);
     }
 
     function testSystemPusherTakeover() public {
@@ -124,7 +86,7 @@ contract BufferTest is BaseTest {
 
         // make sure everything was put in properly
         for (uint256 i = 0; i < 20; i++) {
-            _shouldHaveAtIndex(i + 1, i);
+            _shouldHave(i + 1);
         }
 
         // try to use the aliased pusher to push more items, should fail
@@ -151,11 +113,7 @@ contract BufferTest is BaseTest {
 
     function _shouldHave(uint256 blockNumber) internal {
         assertEq(buffer.parentBlockHash(blockNumber), keccak256(abi.encode(blockNumber)));
-    }
-
-    function _shouldHaveAtIndex(uint256 blockNumber, uint256 index) internal {
-        _shouldHave(blockNumber);
-        // assertEq(buffer.blockNumberBuffer(index), blockNumber);
+        assertEq(buffer.blockNumberBuffer(blockNumber % buffer.bufferSize()), blockNumber);
     }
 
     function _shouldNotHave(uint256 blockNumber) internal {
