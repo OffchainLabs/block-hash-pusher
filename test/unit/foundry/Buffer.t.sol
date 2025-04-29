@@ -71,6 +71,38 @@ contract BufferTest is BaseTest {
         _shouldNotHave(2);
     }
 
+    function testCannotOverwriteNewerBlocks() public {
+        _deploy();
+
+        // fill the buffer with 10 items
+        _putItemsInBuffer(buffer.bufferSize(), 10);
+
+        // try to overwrite the first 5 items
+        _putItemsInBuffer(1, 5);
+
+        // should retain the later blocks
+        for (uint256 i = 0; i < 10; i++) {
+            _shouldHave(buffer.bufferSize() + i);
+        }
+    }
+
+    function testOutOfOrderPush() public {
+        _deploy();
+
+        // fill 10-20
+        _putItemsInBuffer(10, 10);
+
+        // fill 5-15
+        _putItemsInBuffer(5, 10);
+
+        // should have 5-20
+        for (uint256 i = 5; i < 20; i++) {
+            _shouldHave(i);
+        }
+        _shouldNotHave(4);
+        _shouldNotHave(21);
+    }
+
     function testSystemPusherTakeover() public {
         _deploy();
 
