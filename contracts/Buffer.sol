@@ -80,5 +80,7 @@ contract Buffer is IBuffer {
             blockHashMapping[blockNumber] = blockHashes[i];
             blockNumberBuffer[bufferIndex] = blockNumber;
         }
+
+        emit BlockHashesPushed(firstBlockNumber, firstBlockNumber + blockHashes.length - 1);
     }
 }

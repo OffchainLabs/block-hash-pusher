@@ -140,6 +140,8 @@ contract BufferTest is BaseTest {
             hashes[i] = keccak256(abi.encode(start + i));
         }
         vm.prank(useSystem ? buffer.systemPusher() : AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
+        vm.expectEmit(true, false, false, true, address(buffer));
+        emit IBuffer.BlockHashesPushed(start, start + length - 1);
         buffer.receiveHashes(start, hashes);
     }
 
