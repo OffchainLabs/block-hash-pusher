@@ -12,9 +12,12 @@ import {IERC20Bridge} from "@arbitrum/nitro-contracts/src/bridge/IERC20Bridge.so
 import {IBuffer} from "./interfaces/IBuffer.sol";
 import {IPusher} from "./interfaces/IPusher.sol";
 
-/// @notice The Pusher gets the hash of the previous block and pushes it to the buffer on the child chain via retryable ticket.
+/// @notice The Pusher gets the hashes of some previous blocks and pushes them to the buffer on the child chain via retryable ticket.
 contract Pusher is IPusher {
     using SafeERC20 for IERC20;
+
+    /// @inheritdoc IPusher
+    uint256 public constant MAX_BATCH_SIZE = 256;
 
     /// @inheritdoc IPusher
     bool public immutable isArbitrum;
@@ -27,13 +30,15 @@ contract Pusher is IPusher {
     }
 
     /// @inheritdoc IPusher
-    function pushHash(address inbox, uint256 gasPriceBid, uint256 gasLimit, uint256 submissionCost, bool isERC20Inbox)
-        external
-        payable
-    {
-        uint256 blockNumber = isArbitrum ? ArbSys(address(100)).arbBlockNumber() - 1 : block.number - 1;
-        bytes32[] memory blockHashes = new bytes32[](1);
-        blockHashes[0] = isArbitrum ? ArbSys(address(100)).arbBlockHash(blockNumber) : blockhash(blockNumber);
+    function pushHashes(
+        address inbox,
+        uint256 batchSize,
+        uint256 gasPriceBid,
+        uint256 gasLimit,
+        uint256 submissionCost,
+        bool isERC20Inbox
+    ) external payable {
+        (uint256 firstBlockNumber, bytes32[] memory blockHashes) = _buildBlockHashArray(batchSize);
 
         if (isERC20Inbox) {
             // transfer tokens from the sender to the inbox to pay for the retryable ticket
@@ -52,7 +57,7 @@ contract Pusher is IPusher {
                 callValueRefundAddress: msg.sender,
                 gasLimit: gasLimit,
                 maxFeePerGas: gasPriceBid,
-                data: abi.encodeCall(IBuffer.receiveHashes, (blockNumber, blockHashes)),
+                data: abi.encodeCall(IBuffer.receiveHashes, (firstBlockNumber, blockHashes)),
                 tokenTotalFeeAmount: tokenTotalFeeAmount
             });
         } else {
@@ -70,10 +75,35 @@ contract Pusher is IPusher {
                 callValueRefundAddress: msg.sender,
                 gasLimit: gasLimit,
                 maxFeePerGas: gasPriceBid,
-                data: abi.encodeCall(IBuffer.receiveHashes, (blockNumber, blockHashes))
+                data: abi.encodeCall(IBuffer.receiveHashes, (firstBlockNumber, blockHashes))
             });
         }
 
-        emit BlockHashPushed(blockNumber);
+        emit BlockHashesPushed(firstBlockNumber);
+    }
+
+    /// @dev Build an array of the last 256 block hashes
+    function _buildBlockHashArray(uint256 batchSize)
+        internal
+        view
+        returns (uint256 firstBlockNumber, bytes32[] memory blockHashes)
+    {
+        if (batchSize == 0 || batchSize > MAX_BATCH_SIZE) {
+            revert InvalidBatchSize(batchSize);
+        }
+
+        blockHashes = new bytes32[](batchSize);
+
+        if (isArbitrum) {
+            firstBlockNumber = ArbSys(address(100)).arbBlockNumber() - batchSize;
+            for (uint256 i = 0; i < batchSize; i++) {
+                blockHashes[i] = ArbSys(address(100)).arbBlockHash(firstBlockNumber + i);
+            }
+        } else {
+            firstBlockNumber = block.number - batchSize;
+            for (uint256 i = 0; i < batchSize; i++) {
+                blockHashes[i] = blockhash(firstBlockNumber + i);
+            }
+        }
     }
 }

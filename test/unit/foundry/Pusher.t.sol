@@ -20,24 +20,32 @@ contract PusherTest is BaseTest {
     function testPushesOnArb() public {
         _deployArbSys();
         _deploy();
-        bytes32[] memory blockHashes = new bytes32[](1);
+        uint256 batchSize = 256;
+        bytes32[] memory blockHashes = new bytes32[](batchSize);
         uint256 arbBlockNum = ArbSys(address(100)).arbBlockNumber();
-
-        blockHashes[0] = ArbSys(address(100)).arbBlockHash(arbBlockNum - 1);
-
-        _push(0, 0, 0, abi.encodeCall(Buffer.receiveHashes, (arbBlockNum - 1, blockHashes)));
+        for (uint256 i = 0; i < batchSize; i++) {
+            blockHashes[i] = ArbSys(address(100)).arbBlockHash(arbBlockNum - batchSize + i);
+        }
+        _push(batchSize, 0, 0, 0, abi.encodeCall(Buffer.receiveHashes, (arbBlockNum - batchSize, blockHashes)));
     }
 
     function testPushesOnNonArb() public {
         _deploy();
-        bytes32[] memory blockHashes = new bytes32[](1);
-        blockHashes[0] = blockhash(rollTo - 1);
-        _push(0, 0, 0, abi.encodeCall(Buffer.receiveHashes, (rollTo - 1, blockHashes)));
+        uint256 batchSize = 100;
+        bytes32[] memory blockHashes = new bytes32[](batchSize);
+        for (uint256 i = 0; i < batchSize; i++) {
+            blockHashes[i] = blockhash(rollTo - batchSize + i);
+        }
+        _push(batchSize, 0, 0, 0, abi.encodeCall(Buffer.receiveHashes, (rollTo - batchSize, blockHashes)));
     }
 
-    function _push(uint256 gasPriceBid, uint256 gasLimit, uint256 submissionCost, bytes memory expectedBufferCalldata)
-        internal
-    {
+    function _push(
+        uint256 batchSize,
+        uint256 gasPriceBid,
+        uint256 gasLimit,
+        uint256 submissionCost,
+        bytes memory expectedBufferCalldata
+    ) internal {
         address mockInbox = address(new MockInbox());
         address caller = address(0x5678);
 
@@ -47,8 +55,9 @@ contract PusherTest is BaseTest {
         );
         vm.prank(caller);
         vm.expectCall(mockInbox, gasPriceBid * gasLimit + submissionCost, expectedInboxCalldata, 1);
-        pusher.pushHash{value: gasPriceBid * gasLimit + submissionCost}({
+        pusher.pushHashes{value: gasPriceBid * gasLimit + submissionCost}({
             inbox: mockInbox,
+            batchSize: batchSize,
             gasPriceBid: gasPriceBid,
             gasLimit: gasLimit,
             submissionCost: submissionCost,
