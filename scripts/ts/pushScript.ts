@@ -7,6 +7,7 @@ import { parseIntThrowing } from './util'
 
 program
   .argument('<inbox>', 'The inbox address to push through')
+  .option('--num-blocks <blocks>', 'The number of blocks to push', '256')
   .option(
     '--min-elapsed <blocks>',
     'The minimum number of elapsed blocks since the last push. ' +
@@ -34,6 +35,7 @@ program
       ),
       getEnv('PUSHER_ADDRESS'),
       inbox,
+      parseIntThrowing(options.numBlocks),
       {
         ...options,
         minElapsed: options.minElapsed

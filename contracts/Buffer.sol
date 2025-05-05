@@ -26,9 +26,6 @@ contract Buffer is IBuffer {
     bool public systemHasPushed;
 
     /// @inheritdoc IBuffer
-    uint248 public bufferPtr;
-
-    /// @inheritdoc IBuffer
     mapping(uint256 => bytes32) public blockHashMapping;
 
     /// @inheritdoc IBuffer
@@ -51,22 +48,8 @@ contract Buffer is IBuffer {
     }
 
     /// @inheritdoc IBuffer
-    function receiveHashes(uint256 firstBlockNumber, bytes32[] calldata blockHashes) external returns (bool success) {
-        uint256 startPtr = bufferPtr;
-        uint256 prevPtr = (startPtr + bufferSize - 1) % bufferSize;
-        uint256 prevBlockNumber = blockNumberBuffer[prevPtr];
-
-        // if the previous value in the ring buffer is >= firstBlockNumber, adjust the range we are writing to start from prev + 1
-        // determine the range of block numbers we are writing [writeStart, writeEnd)
-        uint256 writeStart = prevBlockNumber >= firstBlockNumber ? prevBlockNumber + 1 : firstBlockNumber;
-        uint256 writeEnd = firstBlockNumber + blockHashes.length;
-
-        // ensure the range is valid, if not, skip
-        if (writeEnd <= writeStart) {
-            return false;
-        }
-
-        // check caller authorization
+    function receiveHashes(uint256 firstBlockNumber, bytes32[] calldata blockHashes) external {
+        // access control
         if (systemHasPushed) {
             // if the system has pushed, only the system can push
             if (msg.sender != systemPusher) {
@@ -80,26 +63,24 @@ contract Buffer is IBuffer {
             revert NotPusher();
         }
 
-        // write to the buffer in a loop
-        for (uint256 blockToWrite = writeStart; blockToWrite < writeEnd; blockToWrite++) {
-            uint256 currPtr = (startPtr + blockToWrite - writeStart) % bufferSize;
-
-            // if we are overwriting a block number, delete its hash from the mapping
-            uint256 valueAtPtr = blockNumberBuffer[currPtr];
-            if (valueAtPtr != 0) {
-                blockHashMapping[valueAtPtr] = 0;
+        // write the hashes to the buffer, evicting old hashes as necessary
+        for (uint256 i = 0; i < blockHashes.length; i++) {
+            uint256 blockNumber = firstBlockNumber + i;
+            uint256 bufferIndex = blockNumber % bufferSize;
+            uint256 existingBlockNumber = blockNumberBuffer[bufferIndex];
+            if (blockNumber <= existingBlockNumber) {
+                // noop
+                continue;
             }
-
-            // write the new block number into the buffer
-            blockNumberBuffer[currPtr] = blockToWrite;
-
-            // write the new hash into the mapping
-            blockHashMapping[blockToWrite] = blockHashes[blockToWrite - firstBlockNumber];
+            if (existingBlockNumber != 0) {
+                // evict the old block hash
+                blockHashMapping[existingBlockNumber] = 0;
+            }
+            // store the new block hash
+            blockHashMapping[blockNumber] = blockHashes[i];
+            blockNumberBuffer[bufferIndex] = blockNumber;
         }
 
-        // increment the pointer
-        bufferPtr = uint248((startPtr + writeEnd - writeStart) % bufferSize);
-
-        return true;
+        emit BlockHashesPushed(firstBlockNumber, firstBlockNumber + blockHashes.length - 1);
     }
 }

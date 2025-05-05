@@ -2,6 +2,11 @@ import { expect } from 'chai'
 import { Buffer__factory } from '../../typechain-types'
 import { OrbitTestSetup, testSetup } from './testSetup'
 import { ethers, Signer, Wallet } from 'ethers'
+import {
+  L1ToL2MessageStatus,
+  L1ToL2MessageWriter,
+} from '../../lib/arbitrum-sdk/src'
+import { L1ContractCallTransactionReceipt } from '../../lib/arbitrum-sdk/src/lib/message/L1Transaction'
 import { push } from '../../scripts/ts/lib/push'
 
 const CREATE2_FACTORY = '0x32ea7F2A6f7a2d442bADf82fEA569BA33aD97DD6'
@@ -136,6 +141,7 @@ describe('Pusher & Buffer', () => {
         isL3
           ? setup.l3Network.ethBridge.inbox
           : setup.l2Network.ethBridge.inbox,
+        1, // todo: make this configurable
         options,
         logger.log.bind(logger)
       ))!
