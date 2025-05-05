@@ -13,9 +13,10 @@ interface IBuffer {
     /// @param  firstBlockNumber The block number of the first block in the batch.
     /// @param  lastBlockNumber The block number of the last block in the batch.
     event BlockHashesPushed(uint256 firstBlockNumber, uint256 lastBlockNumber);
-    /// @notice Thrown by `parentBlockHash` when the block hash for a given block number is not found.
 
+    /// @notice Thrown by `parentBlockHash` when the block hash for a given block number is not found.
     error UnknownParentBlockHash(uint256 parentBlockNumber);
+
     /// @dev Thrown when the caller is not authorized to push hashes.
     error NotPusher();
 

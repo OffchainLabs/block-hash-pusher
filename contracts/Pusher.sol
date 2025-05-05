@@ -79,7 +79,7 @@ contract Pusher is IPusher {
             });
         }
 
-        emit BlockHashesPushed(firstBlockNumber);
+        emit BlockHashesPushed(firstBlockNumber, firstBlockNumber + batchSize - 1);
     }
 
     /// @dev Build an array of the last 256 block hashes
