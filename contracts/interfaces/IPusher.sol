@@ -18,9 +18,14 @@ interface IPusher {
     /// @param gasLimit The gas limit for the transaction.
     /// @param submissionCost The cost of submitting the transaction.
     /// @param isERC20Inbox Whether the inbox is an ERC20 inbox.
-    function pushHashes(address inbox, uint256 batchSize, uint256 gasPriceBid, uint256 gasLimit, uint256 submissionCost, bool isERC20Inbox)
-        external
-        payable;
+    function pushHashes(
+        address inbox,
+        uint256 batchSize,
+        uint256 gasPriceBid,
+        uint256 gasLimit,
+        uint256 submissionCost,
+        bool isERC20Inbox
+    ) external payable;
 
     /// @notice The max allowable number of hashes to push per call to pushHashes.
     function MAX_BATCH_SIZE() external view returns (uint256);
