@@ -1,51 +1,37 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ArbSys} from "@arbitrum/nitro-contracts/src/precompiles/ArbSys.sol";
-import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
 import {ArbitrumChecker} from "@arbitrum/nitro-contracts/src/libraries/ArbitrumChecker.sol";
 import {IInbox} from "@arbitrum/nitro-contracts/src/bridge/IInbox.sol";
 import {IERC20Inbox} from "@arbitrum/nitro-contracts/src/bridge/IERC20Inbox.sol";
+import {IERC20Bridge} from "@arbitrum/nitro-contracts/src/bridge/IERC20Bridge.sol";
 import {IBuffer} from "./interfaces/IBuffer.sol";
+import {IPusher} from "./interfaces/IPusher.sol";
 
-/// @notice The Pusher gets the hash of the previous 256 blocks and pushes them to the buffer on the child chain via retryable ticket.
-contract Pusher {
-    /// @notice The number of hashes to push per transaction.
+/// @notice The Pusher gets the hashes of some previous blocks and pushes them to the buffer on the child chain via retryable ticket.
+contract Pusher is IPusher {
+    using SafeERC20 for IERC20;
+
+    /// @inheritdoc IPusher
     uint256 public constant MAX_BATCH_SIZE = 256;
 
-    /// @notice Whether this contract is deployed on an Arbitrum chain.
-    ///         This condition changes the way the block number is retrieved.
+    /// @inheritdoc IPusher
     bool public immutable isArbitrum;
-    /// @notice The address of the buffer contract on the child chain.
+    /// @inheritdoc IPusher
     address public immutable bufferAddress;
-
-    /// @notice Emitted when block hashes are pushed to the buffer.
-    event BlockHashesPushed(uint256 firstBlockNumber);
-
-    /// @notice Thrown when incorrect msg.value is provided
-    error IncorrectMsgValue(uint256 expected, uint256 provided);
-
-    /// @notice Thrown when the batch size is invalid.
-    error InvalidBatchSize(uint256 batchSize);
 
     constructor(address _bufferAddress) {
         bufferAddress = _bufferAddress;
         isArbitrum = ArbitrumChecker.runningOnArbitrum();
     }
 
-    /// @notice Push the hash of the previous block to the buffer on the child chain specified by inbox
-    ///         For custom fee chains, the caller must either set gasPriceBid, gasLimit, and submissionCost to 0 and manually redeem on the child,
-    ///         or prefund the chain's inbox with the appropriate amount of fees.
-    ///         (this is an [efficiency + implementation simplicity] vs [operator UX] tradeoff)
-    /// @param inbox The address of the inbox on the child chain
-    /// @param batchSize The number of hashes to push. Must be less than or equal to MAX_BATCH_SIZE. Must be at least 1.
-    /// @param gasPriceBid The gas price bid for the transaction.
-    /// @param gasLimit The gas limit for the transaction.
-    /// @param submissionCost The cost of submitting the transaction.
-    /// @param isERC20Inbox Whether the inbox is an ERC20 inbox.
-    function pushHash(
+    /// @inheritdoc IPusher
+    function pushHashes(
         address inbox,
-        uint256 batchSize, // todo: this should probably be removed and forced to 1. weird race conditions can come up with user choice
+        uint256 batchSize,
         uint256 gasPriceBid,
         uint256 gasLimit,
         uint256 submissionCost,
@@ -54,6 +40,14 @@ contract Pusher {
         (uint256 firstBlockNumber, bytes32[] memory blockHashes) = _buildBlockHashArray(batchSize);
 
         if (isERC20Inbox) {
+            // transfer tokens from the sender to the inbox to pay for the retryable ticket
+            uint256 tokenTotalFeeAmount = gasLimit * gasPriceBid + submissionCost;
+            if (tokenTotalFeeAmount > 0) {
+                address token = IERC20Bridge(address(IERC20Inbox(inbox).bridge())).nativeToken();
+                IERC20(token).safeTransferFrom(msg.sender, inbox, tokenTotalFeeAmount);
+            }
+
+            // create the retryable ticket
             IERC20Inbox(inbox).createRetryableTicket({
                 to: bufferAddress,
                 l2CallValue: 0,
@@ -63,12 +57,15 @@ contract Pusher {
                 gasLimit: gasLimit,
                 maxFeePerGas: gasPriceBid,
                 data: abi.encodeCall(IBuffer.receiveHashes, (firstBlockNumber, blockHashes)),
-                tokenTotalFeeAmount: gasLimit * gasPriceBid + submissionCost
+                tokenTotalFeeAmount: tokenTotalFeeAmount
             });
         } else {
+            // check that the msg.value is correct
             if (msg.value != gasLimit * gasPriceBid + submissionCost) {
                 revert IncorrectMsgValue(gasLimit * gasPriceBid + submissionCost, msg.value);
             }
+
+            // create the retryable ticket
             IInbox(inbox).createRetryableTicket{value: msg.value}({
                 to: bufferAddress,
                 l2CallValue: 0,
@@ -81,7 +78,7 @@ contract Pusher {
             });
         }
 
-        emit BlockHashesPushed(firstBlockNumber);
+        emit BlockHashesPushed(firstBlockNumber, firstBlockNumber + batchSize - 1);
     }
 
     /// @dev Build an array of the last 256 block hashes

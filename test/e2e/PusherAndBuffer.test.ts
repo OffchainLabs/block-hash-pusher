@@ -108,7 +108,7 @@ describe('Pusher & Buffer', () => {
         setup.l1Signer
       )
       pusherAddress = ethers.getCreateAddress({ from: bufferAddress, nonce: 1 })
-      console.log(bufferAddress, pusherAddress)
+
       // require code at the addresses
       expect(await setup.l1Provider.getCode(bufferAddress)).to.not.eq('0x')
       expect(await setup.l1Provider.getCode(pusherAddress)).to.not.eq('0x')
@@ -126,66 +126,80 @@ describe('Pusher & Buffer', () => {
       expect(await setup.l3Provider.getCode(pusherAddress)).to.not.eq('0x')
     })
 
+    async function pushTest(
+      isL3: boolean,
+      options: {
+        isCustomFee: boolean
+        manualRedeem: boolean
+      }
+    ) {
+      const logger = new FakeLogger()
+      const receipt = (await push(
+        isL3 ? setup.l2Signer : setup.l1Signer,
+        isL3 ? setup.l3Signer : setup.l2Signer,
+        pusherAddress,
+        isL3
+          ? setup.l3Network.ethBridge.inbox
+          : setup.l2Network.ethBridge.inbox,
+        1, // todo: make this configurable
+        options,
+        logger.log.bind(logger)
+      ))!
+
+      // should auto redeem
+      if (
+        options.manualRedeem &&
+        !logger.logsContain('Manual redeem complete')
+      ) {
+        throw new Error('manual redeem not found in logs')
+      }
+      if (
+        !options.manualRedeem &&
+        !logger.logsContain('automatically redeemed')
+      ) {
+        throw new Error('auto redeem not found in logs')
+      }
+
+      // check that we've pushed some block hashes
+      const buffer = Buffer__factory.connect(
+        bufferAddress,
+        isL3 ? setup.l3Signer : setup.l2Signer
+      )
+      const parentBlockNumber = receipt.blockNumber - 1
+      const blockHash = (await (
+        isL3 ? setup.l2Provider : setup.l1Provider
+      ).getBlock(parentBlockNumber))!.hash
+      const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
+      expect(pushedHash).to.eq(blockHash, `Block hash does not match`)
+    }
+
     describe('Pushing to L2', () => {
-      it('should push 256 blocks to L2, and successfully auto redeem', async () => {
-        const logger = new FakeLogger()
-        const receipt = (await push(
-          setup.l1Signer,
-          setup.l2Signer,
-          pusherAddress,
-          setup.l2Network.ethBridge.inbox,
-          256,
-          {},
-          logger.log.bind(logger)
-        ))!
-
-        // should auto redeem
-        if (!logger.logsContain('automatically redeemed')) {
-          throw new Error('auto redeem not found in logs')
-        }
-
-        // check that we've pushed some block hashes
-        const buffer = Buffer__factory.connect(bufferAddress, setup.l2Signer)
-        for (let i = 0; i < 256; i++) {
-          const parentBlockNumber = receipt.blockNumber - 256 + i
-          const blockHash = (await setup.l1Provider.getBlock(
-            parentBlockNumber
-          ))!.hash
-          const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
-          expect(pushedHash).to.eq(blockHash, `Block hash ${i} does not match`)
-        }
+      it('should push 1 block to L2, and require manual redeem', async () => {
+        await pushTest(false, {
+          isCustomFee: false,
+          manualRedeem: true,
+        })
+      })
+      it('should push 1 block to L2, and successfully auto redeem', async () => {
+        await pushTest(false, {
+          isCustomFee: false,
+          manualRedeem: false,
+        })
       })
     })
 
     describe('Pushing to L3', () => {
-      it('should push 256 blocks to L3, and require manual redeem', async () => {
-        const logger = new FakeLogger()
-        const receipt = (await push(
-          setup.l2Signer,
-          setup.l3Signer,
-          pusherAddress,
-          setup.l3Network.ethBridge.inbox,
-          256,
-          {
-            isCustomFee: true,
-          },
-          logger.log.bind(logger)
-        ))!
-
-        // should require manual redeem
-        if (!logger.logsContain('Manual redeem complete')) {
-          throw new Error('manual redeem not found in logs')
-        }
-
-        const buffer = Buffer__factory.connect(bufferAddress, setup.l3Signer)
-        for (let i = 0; i < 256; i++) {
-          const parentBlockNumber = receipt.blockNumber - 256 + i
-          const blockHash = (await setup.l2Provider.getBlock(
-            parentBlockNumber
-          ))!.hash
-          const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
-          expect(pushedHash).to.eq(blockHash, `Block hash ${i} does not match`)
-        }
+      it('should push 1 block to L3, and require manual redeem', async () => {
+        await pushTest(true, {
+          isCustomFee: true,
+          manualRedeem: true,
+        })
+      })
+      it('should push 1 block to L3, and auto redeem', async () => {
+        await pushTest(true, {
+          isCustomFee: true,
+          manualRedeem: false,
+        })
       })
     })
   })

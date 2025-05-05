@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import "forge-std/Test.sol";
-import {Buffer} from "contracts/Buffer.sol";
+import {Buffer, IBuffer} from "contracts/Buffer.sol";
 import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/AddressAliasHelper.sol";
 import {BaseTest} from "test/unit/foundry/BaseTest.t.sol";
 
@@ -10,22 +10,22 @@ contract BufferTest is BaseTest {
     function testAccessControl() public {
         _deploy();
         address rando = address(0x123);
-        vm.expectRevert(Buffer.NotPusher.selector);
+        vm.expectRevert(IBuffer.NotPusher.selector);
         vm.prank(rando);
-        buffer.receiveHashes(0, new bytes32[](0));
+        buffer.receiveHashes(1, new bytes32[](1));
 
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
         buffer.receiveHashes(1, new bytes32[](1));
 
-        vm.prank(buffer._systemPusher());
-        buffer.receiveHashes(1, new bytes32[](2));
+        vm.prank(buffer.systemPusher());
+        buffer.receiveHashes(2, new bytes32[](1));
     }
 
     function testCanPushFirstItem() public {
         _deploy();
         _putItemsInBuffer(1, 1);
 
-        _shouldHaveAtIndex(1, 0);
+        _shouldHave(1);
     }
 
     function testCanPushFirstItems() public {
@@ -36,7 +36,7 @@ contract BufferTest is BaseTest {
         _putItemsInBuffer(first, len);
 
         for (uint256 i = 0; i < len; i++) {
-            _shouldHaveAtIndex(first + i, i);
+            _shouldHave(first + i);
         }
     }
 
@@ -44,18 +44,18 @@ contract BufferTest is BaseTest {
         _deploy();
 
         // fill everything but the last 10 items
-        _putItemsInBuffer(1, buffer._bufferSize() - 10);
+        _putItemsInBuffer(1, buffer.bufferSize() - 10);
 
         // fill the last 10 items plus 10 more
         // this should overwrite the first 10 items
-        _putItemsInBuffer(buffer._bufferSize() - 9, 20);
+        _putItemsInBuffer(buffer.bufferSize() - 9, 20);
 
         for (uint256 i = 0; i < 10; i++) {
-            uint256 eBlockNumber = buffer._bufferSize() + i + 1;
+            uint256 eBlockNumber = buffer.bufferSize() + i + 1;
 
             // should overwrite the first 10 items
             // should have set the block hash to the correct value
-            _shouldHaveAtIndex(eBlockNumber, i);
+            _shouldHave(eBlockNumber);
 
             // should have evicted the old block hashes
             _shouldNotHave(i + 1);
@@ -71,42 +71,36 @@ contract BufferTest is BaseTest {
         _shouldNotHave(2);
     }
 
-    function testRangeValidityChecking() public {
+    function testCannotOverwriteNewerBlocks() public {
         _deploy();
 
-        // put some stuff in the buffer
-        _putItemsInBuffer(1, 10);
+        // fill the buffer with 10 items
+        _putItemsInBuffer(buffer.bufferSize(), 10);
 
-        // cannot push zero length range
-        vm.startPrank(buffer._systemPusher());
-        vm.expectRevert(abi.encodeWithSelector(Buffer.InvalidBlockRange.selector, 10, 11, 0));
-        buffer.receiveHashes(11, new bytes32[](0));
+        // try to overwrite the first 5 items
+        _putItemsInBuffer(1, 5);
 
-        // cannot push a range whose end <= the last item in the buffer
-        // test <
-        vm.expectRevert(abi.encodeWithSelector(Buffer.InvalidBlockRange.selector, 10, 5, 4));
-        buffer.receiveHashes(5, new bytes32[](4));
-        // test ==
-        vm.expectRevert(abi.encodeWithSelector(Buffer.InvalidBlockRange.selector, 10, 5, 6));
-        buffer.receiveHashes(5, new bytes32[](6));
-        vm.stopPrank();
-
-        // can push a range whose end > the last item in the buffer and start <= the last item in the buffer
-        // test <
-        _putItemsInBuffer(5, 7);
-        // test ==
-        _putItemsInBuffer(11, 2);
-
-        for (uint256 i = 0; i < 12; i++) {
-            _shouldHaveAtIndex(i + 1, i);
+        // should retain the later blocks
+        for (uint256 i = 0; i < 10; i++) {
+            _shouldHave(buffer.bufferSize() + i);
         }
+    }
 
-        // we can skip ahead and push a range that starts > the last item in the buffer
-        _putItemsInBuffer(20, 2);
-        _shouldHaveAtIndex(20, 12);
-        _shouldHaveAtIndex(21, 13);
-        _shouldNotHave(22);
-        _shouldNotHave(19);
+    function testOutOfOrderPush() public {
+        _deploy();
+
+        // fill 10-20
+        _putItemsInBuffer(10, 10);
+
+        // fill 5-15
+        _putItemsInBuffer(5, 10);
+
+        // should have 5-20
+        for (uint256 i = 5; i < 20; i++) {
+            _shouldHave(i);
+        }
+        _shouldNotHave(4);
+        _shouldNotHave(21);
     }
 
     function testSystemPusherTakeover() public {
@@ -115,16 +109,20 @@ contract BufferTest is BaseTest {
         // fill the buffer with 10 items
         _putItemsInBuffer(1, 10, false);
 
+        assertFalse(buffer.systemHasPushed());
+
         // fill the buffer with 10 items using the system pusher
         _putItemsInBuffer(11, 10, true);
 
+        assertTrue(buffer.systemHasPushed());
+
         // make sure everything was put in properly
         for (uint256 i = 0; i < 20; i++) {
-            _shouldHaveAtIndexWithPusher(i + 1, i, i >= 10);
+            _shouldHave(i + 1);
         }
 
         // try to use the aliased pusher to push more items, should fail
-        vm.expectRevert(Buffer.NotPusher.selector);
+        vm.expectRevert(IBuffer.NotPusher.selector);
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
         buffer.receiveHashes(21, new bytes32[](10));
 
@@ -141,27 +139,19 @@ contract BufferTest is BaseTest {
         for (uint256 i = 0; i < length; i++) {
             hashes[i] = keccak256(abi.encode(start + i));
         }
-        vm.prank(useSystem ? buffer._systemPusher() : AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
+        vm.prank(useSystem ? buffer.systemPusher() : AddressAliasHelper.applyL1ToL2Alias(address(pusher)));
+        vm.expectEmit(true, false, false, true, address(buffer));
+        emit IBuffer.BlockHashesPushed(start, start + length - 1);
         buffer.receiveHashes(start, hashes);
     }
 
     function _shouldHave(uint256 blockNumber) internal {
         assertEq(buffer.parentBlockHash(blockNumber), keccak256(abi.encode(blockNumber)));
-    }
-
-    function _shouldHaveAtIndex(uint256 blockNumber, uint256 index) internal {
-        _shouldHave(blockNumber);
-        assertEq(buffer._blockNumberBuffer(index).blockNumber, blockNumber);
-    }
-
-    function _shouldHaveAtIndexWithPusher(uint256 blockNumber, uint256 index, bool systemPusher) internal {
-        _shouldHave(blockNumber);
-        _shouldHaveAtIndex(blockNumber, index);
-        assertEq(buffer._blockNumberBuffer(index).pushedBySystem, systemPusher);
+        assertEq(buffer.blockNumberBuffer(blockNumber % buffer.bufferSize()), blockNumber);
     }
 
     function _shouldNotHave(uint256 blockNumber) internal {
-        vm.expectRevert(abi.encodeWithSelector(Buffer.UnknownParentBlockHash.selector, blockNumber));
+        vm.expectRevert(abi.encodeWithSelector(IBuffer.UnknownParentBlockHash.selector, blockNumber));
         buffer.parentBlockHash(blockNumber);
     }
 }

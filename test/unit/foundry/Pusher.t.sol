@@ -55,7 +55,7 @@ contract PusherTest is BaseTest {
         );
         vm.prank(caller);
         vm.expectCall(mockInbox, gasPriceBid * gasLimit + submissionCost, expectedInboxCalldata, 1);
-        pusher.pushHash{value: gasPriceBid * gasLimit + submissionCost}({
+        pusher.pushHashes{value: gasPriceBid * gasLimit + submissionCost}({
             inbox: mockInbox,
             batchSize: batchSize,
             gasPriceBid: gasPriceBid,
