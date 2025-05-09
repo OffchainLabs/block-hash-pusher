@@ -26,6 +26,9 @@ contract Buffer is IBuffer {
     bool public systemHasPushed;
 
     /// @inheritdoc IBuffer
+    uint64 public newestBlockNumber;
+
+    /// @inheritdoc IBuffer
     mapping(uint256 => bytes32) public blockHashMapping;
 
     /// @inheritdoc IBuffer
@@ -81,6 +84,13 @@ contract Buffer is IBuffer {
             blockNumberBuffer[bufferIndex] = blockNumber;
         }
 
-        emit BlockHashesPushed(firstBlockNumber, firstBlockNumber + blockHashes.length - 1);
+        uint256 lastBlockNumber = firstBlockNumber + blockHashes.length - 1;
+
+        if (lastBlockNumber > newestBlockNumber) {
+            // update the newest block number
+            newestBlockNumber = uint64(firstBlockNumber + blockHashes.length - 1);
+        }
+
+        emit BlockHashesPushed(firstBlockNumber, lastBlockNumber);
     }
 }

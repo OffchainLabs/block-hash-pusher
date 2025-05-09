@@ -31,6 +31,9 @@ interface IBuffer {
     /// @return The block hash of the parent block.
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32);
 
+    /// @notice The freshest block that has been pushed
+    function newestBlockNumber() external view returns (uint64);
+
     /// @dev 393168 - the size of the buffer. This is the maximum number of block hashes that can be stored.
     ///      For a parent chain with a block time of 250ms, this is equivalent to roughly 27 hours of history,
     ///      which is the same amount of time that EIP-2935 covers for L1 block hashes.
