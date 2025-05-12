@@ -7,6 +7,11 @@ import {AddressAliasHelper} from "@arbitrum/nitro-contracts/src/libraries/Addres
 import {BaseTest} from "test/unit/foundry/BaseTest.t.sol";
 
 contract BufferTest is BaseTest {
+    uint256 highestBlockNumber = 0;
+    function setUp() public {
+        highestBlockNumber = 0;
+    }
+
     function testAccessControl() public {
         _deploy();
         address rando = address(0x123);
@@ -135,6 +140,8 @@ contract BufferTest is BaseTest {
     }
 
     function _putItemsInBuffer(uint256 start, uint256 length, bool useSystem) internal {
+        assertEq(buffer.newestBlockNumber(), highestBlockNumber);
+
         bytes32[] memory hashes = new bytes32[](length);
         for (uint256 i = 0; i < length; i++) {
             hashes[i] = keccak256(abi.encode(start + i));
@@ -143,6 +150,13 @@ contract BufferTest is BaseTest {
         vm.expectEmit(true, false, false, true, address(buffer));
         emit IBuffer.BlockHashesPushed(start, start + length - 1);
         buffer.receiveHashes(start, hashes);
+
+        assertEq(buffer.newestBlockNumber(), _max(highestBlockNumber, start + length - 1));
+        highestBlockNumber = buffer.newestBlockNumber();
+    }
+
+    function _max(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a > b ? a : b;
     }
 
     function _shouldHave(uint256 blockNumber) internal {
