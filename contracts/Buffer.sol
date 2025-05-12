@@ -13,7 +13,7 @@ contract Buffer is IBuffer {
     uint256 public constant bufferSize = 393168;
 
     /// @inheritdoc IBuffer
-    address public constant systemPusher = address(0xA4B05); // todo: choose a good address for this
+    address public constant systemPusher = address(0xA4B05);
 
     /// @inheritdoc IBuffer
     address public immutable aliasedPusher;
@@ -42,7 +42,6 @@ contract Buffer is IBuffer {
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32) {
         bytes32 _parentBlockHash = blockHashMapping[parentBlockNumber];
 
-        // QUESTION: should this revert or simply return 0?
         if (_parentBlockHash == 0) {
             revert UnknownParentBlockHash(parentBlockNumber);
         }
