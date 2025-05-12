@@ -39,14 +39,14 @@ contract Buffer is IBuffer {
     }
 
     /// @inheritdoc IBuffer
-    function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32) {
-        bytes32 _parentBlockHash = blockHashMapping[parentBlockNumber];
+    function parentChainBlockHash(uint256 parentBlockNumber) external view returns (bytes32) {
+        bytes32 _parentChainBlockHash = blockHashMapping[parentBlockNumber];
 
-        if (_parentBlockHash == 0) {
-            revert UnknownParentBlockHash(parentBlockNumber);
+        if (_parentChainBlockHash == 0) {
+            revert UnknownParentChainBlockHash(parentBlockNumber);
         }
 
-        return _parentBlockHash;
+        return _parentChainBlockHash;
     }
 
     /// @inheritdoc IBuffer

@@ -169,7 +169,7 @@ describe('Pusher & Buffer', () => {
       const blockHash = (await (
         isL3 ? setup.l2Provider : setup.l1Provider
       ).getBlock(parentBlockNumber))!.hash
-      const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
+      const pushedHash = await buffer.parentChainBlockHash(parentBlockNumber)
       expect(pushedHash).to.eq(blockHash, `Block hash does not match`)
     }
 
