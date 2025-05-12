@@ -31,7 +31,7 @@ interface IBuffer {
     /// @return The block hash of the parent block.
     function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32);
 
-    /// @notice The freshest block that has been pushed
+    /// @notice The highest block number that has been pushed
     function newestBlockNumber() external view returns (uint64);
 
     /// @dev 393168 - the size of the buffer. This is the maximum number of block hashes that can be stored.
