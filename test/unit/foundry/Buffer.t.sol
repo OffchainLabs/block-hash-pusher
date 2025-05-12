@@ -8,6 +8,7 @@ import {BaseTest} from "test/unit/foundry/BaseTest.t.sol";
 
 contract BufferTest is BaseTest {
     uint256 highestBlockNumber = 0;
+
     function setUp() public {
         highestBlockNumber = 0;
     }
