@@ -161,12 +161,12 @@ contract BufferTest is BaseTest {
     }
 
     function _shouldHave(uint256 blockNumber) internal {
-        assertEq(buffer.parentBlockHash(blockNumber), keccak256(abi.encode(blockNumber)));
+        assertEq(buffer.parentChainBlockHash(blockNumber), keccak256(abi.encode(blockNumber)));
         assertEq(buffer.blockNumberBuffer(blockNumber % buffer.bufferSize()), blockNumber);
     }
 
     function _shouldNotHave(uint256 blockNumber) internal {
-        vm.expectRevert(abi.encodeWithSelector(IBuffer.UnknownParentBlockHash.selector, blockNumber));
-        buffer.parentBlockHash(blockNumber);
+        vm.expectRevert(abi.encodeWithSelector(IBuffer.UnknownParentChainBlockHash.selector, blockNumber));
+        buffer.parentChainBlockHash(blockNumber);
     }
 }

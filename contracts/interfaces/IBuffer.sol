@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 /// @notice This contract is a buffer that stores parent chain block hashes.
-/// @dev    Everything in this interface besides parentBlockHash(uint256) is not guaranteed to be stable.
+/// @dev    Everything in this interface besides parentChainBlockHash(uint256) is not guaranteed to be stable.
 ///         The buffer is sparse, meaning the block numbers are not guaranteed to be contiguous.
 ///         A future version may or may not change the implementation of the buffer to be dense.
 ///         The size of the buffer may increase or decrease in future versions.
@@ -14,8 +14,8 @@ interface IBuffer {
     /// @param  lastBlockNumber The block number of the last block in the batch.
     event BlockHashesPushed(uint256 firstBlockNumber, uint256 lastBlockNumber);
 
-    /// @notice Thrown by `parentBlockHash` when the block hash for a given block number is not found.
-    error UnknownParentBlockHash(uint256 parentBlockNumber);
+    /// @notice Thrown by `parentChainBlockHash` when the block hash for a given block number is not found.
+    error UnknownParentChainBlockHash(uint256 parentBlockNumber);
 
     /// @dev Thrown when the caller is not authorized to push hashes.
     error NotPusher();
@@ -29,7 +29,7 @@ interface IBuffer {
     /// @notice Get a parent block hash given parent block number. Guaranteed to be stable.
     /// @param  parentBlockNumber The block number of the parent block.
     /// @return The block hash of the parent block.
-    function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32);
+    function parentChainBlockHash(uint256 parentBlockNumber) external view returns (bytes32);
 
     /// @notice The highest block number that has been pushed
     function newestBlockNumber() external view returns (uint64);
