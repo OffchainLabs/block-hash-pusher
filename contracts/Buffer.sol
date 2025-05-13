@@ -87,7 +87,7 @@ contract Buffer is IBuffer {
 
         if (lastBlockNumber > newestBlockNumber) {
             // update the newest block number
-            newestBlockNumber = uint64(firstBlockNumber + blockHashes.length - 1);
+            newestBlockNumber = uint64(lastBlockNumber);
         }
 
         emit BlockHashesPushed(firstBlockNumber, lastBlockNumber);
