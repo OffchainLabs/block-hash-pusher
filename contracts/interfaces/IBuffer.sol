@@ -15,7 +15,7 @@ interface IBuffer {
     event BlockHashesPushed(uint256 firstBlockNumber, uint256 lastBlockNumber);
 
     /// @notice Thrown by `parentChainBlockHash` when the block hash for a given block number is not found.
-    error UnknownParentChainBlockHash(uint256 parentBlockNumber);
+    error UnknownParentChainBlockHash(uint256 parentChainBlockNumber);
 
     /// @dev Thrown when the caller is not authorized to push hashes.
     error NotPusher();
@@ -27,9 +27,9 @@ interface IBuffer {
     function receiveHashes(uint256 firstBlockNumber, bytes32[] memory blockHashes) external;
 
     /// @notice Get a parent block hash given parent block number. Guaranteed to be stable.
-    /// @param  parentBlockNumber The block number of the parent block.
+    /// @param  parentChainBlockNumber The block number of the parent block.
     /// @return The block hash of the parent block.
-    function parentChainBlockHash(uint256 parentBlockNumber) external view returns (bytes32);
+    function parentChainBlockHash(uint256 parentChainBlockNumber) external view returns (bytes32);
 
     /// @notice The highest block number that has been pushed
     function newestBlockNumber() external view returns (uint64);
