@@ -26,9 +26,9 @@ interface IBuffer {
     /// @param blockHashes The hashes of the blocks to be pushed. These are assumed to be in contiguous order.
     function receiveHashes(uint256 firstBlockNumber, bytes32[] memory blockHashes) external;
 
-    /// @notice Get a parent block hash given parent block number. Guaranteed to be stable.
-    /// @param  parentChainBlockNumber The block number of the parent block.
-    /// @return The block hash of the parent block.
+    /// @notice Get a parent chain block hash given parent chain block number. Guaranteed to be stable.
+    /// @param  parentChainBlockNumber The block number of the parent chain block.
+    /// @return The block hash of the parent chain block.
     function parentChainBlockHash(uint256 parentChainBlockNumber) external view returns (bytes32);
 
     /// @notice The highest block number that has been pushed
