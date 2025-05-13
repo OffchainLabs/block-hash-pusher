@@ -13,7 +13,7 @@ contract Buffer is IBuffer {
     uint256 public constant bufferSize = 393168;
 
     /// @inheritdoc IBuffer
-    address public constant systemPusher = address(0xA4B05); // todo: choose a good address for this
+    address public constant systemPusher = address(0xA4B05);
 
     /// @inheritdoc IBuffer
     address public immutable aliasedPusher;
@@ -26,6 +26,9 @@ contract Buffer is IBuffer {
     bool public systemHasPushed;
 
     /// @inheritdoc IBuffer
+    uint64 public newestBlockNumber;
+
+    /// @inheritdoc IBuffer
     mapping(uint256 => bytes32) public blockHashMapping;
 
     /// @inheritdoc IBuffer
@@ -36,15 +39,14 @@ contract Buffer is IBuffer {
     }
 
     /// @inheritdoc IBuffer
-    function parentBlockHash(uint256 parentBlockNumber) external view returns (bytes32) {
-        bytes32 _parentBlockHash = blockHashMapping[parentBlockNumber];
+    function parentChainBlockHash(uint256 parentChainBlockNumber) external view returns (bytes32) {
+        bytes32 _parentChainBlockHash = blockHashMapping[parentChainBlockNumber];
 
-        // QUESTION: should this revert or simply return 0?
-        if (_parentBlockHash == 0) {
-            revert UnknownParentBlockHash(parentBlockNumber);
+        if (_parentChainBlockHash == 0) {
+            revert UnknownParentChainBlockHash(parentChainBlockNumber);
         }
 
-        return _parentBlockHash;
+        return _parentChainBlockHash;
     }
 
     /// @inheritdoc IBuffer
@@ -81,6 +83,13 @@ contract Buffer is IBuffer {
             blockNumberBuffer[bufferIndex] = blockNumber;
         }
 
-        emit BlockHashesPushed(firstBlockNumber, firstBlockNumber + blockHashes.length - 1);
+        uint256 lastBlockNumber = firstBlockNumber + blockHashes.length - 1;
+
+        if (lastBlockNumber > newestBlockNumber) {
+            // update the newest block number
+            newestBlockNumber = uint64(lastBlockNumber);
+        }
+
+        emit BlockHashesPushed(firstBlockNumber, lastBlockNumber);
     }
 }

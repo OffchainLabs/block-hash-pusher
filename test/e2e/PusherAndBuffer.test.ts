@@ -165,11 +165,13 @@ describe('Pusher & Buffer', () => {
         bufferAddress,
         isL3 ? setup.l3Signer : setup.l2Signer
       )
-      const parentBlockNumber = receipt.blockNumber - 1
+      const parentChainBlockNumber = receipt.blockNumber - 1
       const blockHash = (await (
         isL3 ? setup.l2Provider : setup.l1Provider
-      ).getBlock(parentBlockNumber))!.hash
-      const pushedHash = await buffer.parentBlockHash(parentBlockNumber)
+      ).getBlock(parentChainBlockNumber))!.hash
+      const pushedHash = await buffer.parentChainBlockHash(
+        parentChainBlockNumber
+      )
       expect(pushedHash).to.eq(blockHash, `Block hash does not match`)
     }
 
