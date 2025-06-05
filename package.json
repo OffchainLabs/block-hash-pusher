@@ -1,7 +1,7 @@
 {
   "name": "block-hash-pusher",
   "version": "1.0.0",
-  "repository": "https://github.com/OffchainLabs/blockchain-eng-template.git",
+  "repository": "https://github.com/OffchainLabs/block-hash-pusher.git",
   "scripts": {
     "prepare": "forge install && cd lib/arbitrum-sdk && yarn",
     "minimal-install": "yarn --ignore-scripts && forge install",
