@@ -21,7 +21,7 @@ program
   )
   .option(
     '--manual-redeem',
-    'Disable payment for auto redeem on parent chain. Always set for custom fee child chains'
+    'Disable payment for auto redeem on parent chain'
   )
   .action(async (inbox, options) => {
     push(
