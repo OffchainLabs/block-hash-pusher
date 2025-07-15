@@ -18,12 +18,12 @@ export class DoubleProvider extends JsonRpcProvider {
     this.v5 = new ethersv5.providers.JsonRpcProvider(url)
     const x = this.v5.send
     this.v5.send = async (method: string, params: any[]) => {
-      const res = await x.bind(this.v5)(method, params)
       console.log(
         method,
         params,
-        res
       )
+      const res = await x.bind(this.v5)(method, params)
+      console.log(res)
       return res
     }
   }
