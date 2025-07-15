@@ -17,12 +17,11 @@ export class DoubleProvider extends JsonRpcProvider {
     super(url)
     this.v5 = new ethersv5.providers.JsonRpcProvider(url)
     this.v5.on('debug', (info) => {
-      if (info.action === 'response') {
-        console.log('\n')
+      if (info.action === 'request') {
         console.log('REQUEST:')
-        console.log(
-          info.request
-        )
+        console.log(info.request)
+      }
+      else if (info.action === 'response') {
         console.log('RESPONSE:')
         console.log(
           info.response
