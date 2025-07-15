@@ -27,6 +27,14 @@ export class DoubleProvider extends JsonRpcProvider {
         console.log(
           info.response
         )
+        if (info.error) {
+          console.log('ERROR:')
+          console.log({
+            code: info.error.code,
+            message: info.error.message,
+            data: info.error.data
+          })
+        }
       }
     })
   }
